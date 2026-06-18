@@ -1,7 +1,7 @@
 import { useGetBricks, useGetTransfers, useTransferBrick, getGetBricksQueryKey, getGetTransfersQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { History, Shield, AlertTriangle, ArrowRight, Loader2 } from "lucide-react";
+import { History, AlertTriangle, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const FRIENDS = ["Yann", "Anselme", "Thomas"];
@@ -54,8 +54,8 @@ export default function Home() {
           <div className="relative h-full bg-card border-2 border-red-500/30 rounded-3xl p-8 flex flex-col items-center text-center space-y-6 overflow-hidden transition-transform duration-500 hover:scale-[1.02] brick-shadow-red">
             <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent opacity-50" />
             
-            <div className="p-4 bg-red-500/10 rounded-full">
-              <Shield className="w-12 h-12 text-red-500" />
+            <div className="p-2">
+              <img src="/red-brick.png" alt="Red Lego Brick" className="w-24 h-24 object-contain drop-shadow-[0_4px_16px_rgba(220,38,38,0.5)]" />
             </div>
             
             <div className="space-y-2">
