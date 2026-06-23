@@ -1,6 +1,6 @@
 const fr = {
   title: "La Brique",
-  subtitle: "Les tokens légendaires de l'Honneur et de la Honte",
+  subtitle: "Les briques légendaires de l'Honneur et de la Honte",
   honor: {
     name: "Brique de l'Honneur",
     heldBy: "Actuellement détenue par",
