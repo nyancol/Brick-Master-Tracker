@@ -1,55 +1,35 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
-import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
-const rawPort = process.env.PORT;
-
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
-}
-
-const port = Number(rawPort);
-
-if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
-}
-
-const basePath = process.env.BASE_PATH;
-
-if (!basePath) {
-  throw new Error(
-    "BASE_PATH environment variable is required but was not provided.",
-  );
+/**
+ * Vite plugin that mounts the Express API (server/app.ts) onto /api in dev.
+ *
+ * NOTE: edits to files under server/ do NOT hot-reload the API — Vite's
+ * ssrLoadModule invalidates the module but the mounted Express middleware
+ * stays bound to the previous instance. Restart `pnpm dev` after server changes.
+ */
+function apiPlugin(): Plugin {
+  return {
+    name: "brick-tracker-api",
+    async configureServer(server) {
+      const mod = await server.ssrLoadModule("/server/app.ts");
+      server.middlewares.use("/api", mod.default);
+    },
+  };
 }
 
 export default defineConfig({
-  base: basePath,
-  plugins: [
-    react(),
-    tailwindcss(),
-    runtimeErrorOverlay(),
-    ...(process.env.NODE_ENV !== "production" &&
-    process.env.REPL_ID !== undefined
-      ? [
-          await import("@replit/vite-plugin-cartographer").then((m) =>
-            m.cartographer({
-              root: path.resolve(import.meta.dirname, ".."),
-            }),
-          ),
-          await import("@replit/vite-plugin-dev-banner").then((m) =>
-            m.devBanner(),
-          ),
-        ]
-      : []),
-  ],
+  plugins: [apiPlugin(), react(), tailwindcss()],
+  ssr: {
+    // better-sqlite3 is a native Node addon; Vite must not try to bundle it.
+    // drizzle-orm/better-sqlite3 is the Drizzle adapter on top of it.
+    external: ["better-sqlite3", "drizzle-orm/better-sqlite3"],
+  },
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "src"),
-      "@assets": path.resolve(import.meta.dirname, "..", "..", "attached_assets"),
     },
     dedupe: ["react", "react-dom"],
   },
@@ -59,16 +39,11 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
-    port,
-    strictPort: true,
     host: "0.0.0.0",
     allowedHosts: true,
-    fs: {
-      strict: true,
-    },
+    fs: { strict: true },
   },
   preview: {
-    port,
     host: "0.0.0.0",
     allowedHosts: true,
   },

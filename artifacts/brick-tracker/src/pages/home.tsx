@@ -1,4 +1,5 @@
-import { useGetBricks, useGetTransfers, useTransferBrick, getGetBricksQueryKey, getGetTransfersQueryKey } from "@workspace/api-client-react";
+import { useBricks, useTransfers, getBricksQueryKey, getTransfersQueryKey } from "@/api/queries";
+import { useTransferBrick } from "@/api/mutations";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { History, ArrowRight, Loader2 } from "lucide-react";
@@ -14,8 +15,8 @@ const LANGS = [
 export default function Home() {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
-  const { data: bricks, isLoading: bricksLoading } = useGetBricks();
-  const { data: transfers, isLoading: transfersLoading } = useGetTransfers();
+  const { data: bricks, isLoading: bricksLoading } = useBricks();
+  const { data: transfers, isLoading: transfersLoading } = useTransfers();
   const transferBrick = useTransferBrick();
 
   const handleTransfer = (color: "red" | "blue", to: string) => {
@@ -23,8 +24,8 @@ export default function Home() {
       { color, data: { to } },
       {
         onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getGetBricksQueryKey() });
-          queryClient.invalidateQueries({ queryKey: getGetTransfersQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getBricksQueryKey });
+          queryClient.invalidateQueries({ queryKey: getTransfersQueryKey });
         },
       }
     );

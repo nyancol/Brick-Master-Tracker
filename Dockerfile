@@ -1,67 +1,75 @@
 # =============================================================================
-# Stage 1: Build
+# Stage 1: Build — install deps, build the SPA, bundle the server.
 # =============================================================================
-# Full Node.js 24 toolchain: pnpm, devDependencies, esbuild, TypeScript, etc.
 FROM node:24-alpine AS build
 
 RUN corepack enable && corepack prepare pnpm@9
 
 WORKDIR /app
 
-# Copy workspace configuration so pnpm understands the workspace protocol
-# and tsconfig.base.json is available for type-checking.
+# Copy workspace configuration and lockfile first so pnpm can resolve
+# workspace protocols and so dependency install is cacheable.
 COPY package.json         ./
 COPY pnpm-workspace.yaml  ./
-COPY tsconfig.base.json  ./
-COPY .npmrc              ./
+COPY tsconfig.base.json   ./
+COPY pnpm-lock.yaml       ./
+COPY .npmrc               ./
 
-# Copy all source — lib/ packages are tsconfig project-references used by
-# api-server, and artifacts/ contains all workload packages.
-COPY lib/       lib/
-COPY artifacts/ artifacts/
+# Copy the workspace package.
+COPY artifacts/brick-tracker ./artifacts/brick-tracker
 
-# Install all dependencies (including devDependencies — esbuild, tsx, and
-# other dev-only tooling are required by the build scripts).
-RUN pnpm install --frozen-lockfile
+# build-base pulls in gcc/g++/binutils/libc-dev/make so node-gyp can compile
+# native modules (better-sqlite3 has no prebuilt for arm64/musl/Node 24).
+# python3 is required by node-gyp itself.
+RUN apk add --no-cache build-base python3 && ln -sf python3 /usr/bin/python
+RUN pnpm install --no-frozen-lockfile
 
-# Build the monorepo.  Root `build` runs typecheck then `pnpm -r build` for
-# every workspace package.  api-server's script uses esbuild to bundle
-# src/index.ts → dist/index.mjs.
-RUN pnpm run build
+# vite build writes the SPA to dist/public; build-server.mjs bundles the
+# Express server into dist/server.mjs (with all npm deps externalised).
+RUN pnpm --filter @workspace/brick-tracker run build
+
+# Run `pnpm deploy` here (inside the workspace) so pnpm can resolve the
+# runtime dependency tree for the @workspace/brick-tracker package into a
+# self-contained directory. better-sqlite3's install script must run (it
+# verifies/downloads the native binding); it is whitelisted via
+# onlyBuiltDependencies in pnpm-workspace.yaml.
+RUN pnpm --filter @workspace/brick-tracker deploy --prod --legacy ./deploy
 
 # =============================================================================
-# Stage 2: Production
+# Stage 2: Production — bundled output + pre-built deploy dir + SQLite data.
 # =============================================================================
 FROM node:24-alpine AS production
 
-# Create a non-root user for security.
 RUN addgroup -g 1001 -S appgroup && \
     adduser  -u 1001 -S appuser -G appgroup
 
 WORKDIR /app
 
-# Copy the lockfile and the api-server package manifest from the build stage.
-# The esbuild bundle (dist/index.mjs) is fully self-contained — all workspace
-# source is inlined — but runtime packages (express, pino, pg, drizzle-orm,
-# etc.) are external and must be installed here.
-COPY --from=build /app/pnpm-lock.yaml                  ./pnpm-lock.yaml
-COPY --from=build /app/artifacts/api-server/package.json ./package.json
+# Copy the pre-built self-contained deploy directory (runtime deps +
+# dist/server.mjs + dist/public already copied in below).
+COPY --from=build /app/deploy ./deploy
 
-# pnpm deploy reads package.json from the deploy root, resolves workspace://
-# URLs from the lockfile, and copies only the actual runtime dependencies
-# (no devDependencies, no source files) into ./deploy/.
-RUN pnpm deploy --prod --ignore-scripts ./deploy
-
-# Copy the esbuild bundle into the deploy root.
-COPY --from=build /app/artifacts/api-server/dist ./deploy/dist
+# Create the SQLite data directory and grant ownership to appuser. Mount a
+# volume here in your run command to persist brick.db across container
+# recreations:
+#   docker run -v brick-data:/app/deploy/data -p 5000:5000 brick-tracker
+# Or in compose:
+#   volumes:
+#     - brick-data:/app/deploy/data
+RUN mkdir -p /app/deploy/data && chown -R appuser:appgroup /app/deploy/data
+VOLUME /app/deploy/data
 
 WORKDIR /app/deploy
 
 ENV NODE_ENV=production
+# The Express bundle requires PORT (see server/index.ts).
+ENV PORT=5000
+# Defaults the DB file location inside the volume-mounted data dir.
+ENV DB_PATH=/app/deploy/data/brick.db
 
 USER appuser
 
 EXPOSE 5000
 
-# api-server's start script: node --enable-source-maps ./dist/index.mjs
-CMD ["node", "--enable-source-maps", "./dist/index.mjs"]
+# The Express bundle serves both /api/* and the static SPA from dist/public.
+CMD ["node", "./dist/server.mjs"]
