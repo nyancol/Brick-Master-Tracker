@@ -13,6 +13,7 @@ COPY package.json         ./
 COPY pnpm-workspace.yaml  ./
 COPY tsconfig.base.json   ./
 COPY pnpm-lock.yaml       ./
+COPY tsconfig.json  	  ./
 COPY .npmrc               ./
 
 # Copy the workspace package.
