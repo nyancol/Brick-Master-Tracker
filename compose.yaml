@@ -1,0 +1,21 @@
+services:
+  brick-tracker:
+    container_name: brick-tracker
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    networks:
+      - caddy_public
+    volumes:
+      - ./:/app/data/
+
+networks:
+  caddy_public:
+    driver: bridge
+    external: true
+    name: "caddy_public"
