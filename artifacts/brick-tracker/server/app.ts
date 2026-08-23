@@ -24,8 +24,9 @@ app.use(
 );
 app.use(express.json());
 
-// All API routes are mounted under /api. Static SPA serving (production only)
-// is layered on top in ./index.ts.
-app.use("/api", router);
+// All API routes are mounted at root. The /api prefix is applied by
+// whoever mounts this app: Vite's configureServer in dev, and the
+// production entrypoint in ./index.ts.
+app.use(router);
 
 export default app;

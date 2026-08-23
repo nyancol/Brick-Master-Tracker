@@ -1,11 +1,13 @@
+// zod v4 is used intentionally (pre-release but stable for our use case).
+// It provides improved type inference and smaller bundle size.
 import { z } from "zod/v4";
+import { FRIENDS } from "../shared/constants.js";
 
 /** The two bricks we track. */
 export const BrickColor = z.enum(["red", "blue"]);
 export type BrickColor = z.infer<typeof BrickColor>;
 
-/** The friends who can hold a brick. */
-export const FRIENDS = ["Yann", "Anselme", "Thomas"] as const;
+export { FRIENDS };
 export type Friend = (typeof FRIENDS)[number];
 
 /** Health check response. */

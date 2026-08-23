@@ -38,46 +38,48 @@ bricksRouter.post("/bricks/:color/transfer", async (req, res) => {
   const { color } = paramsResult.data;
   const { to } = bodyResult.data;
 
-  if (!(FRIENDS as readonly string[]).includes(to)) {
-    res.status(400).json({ error: `Invalid friend name. Must be one of: ${FRIENDS.join(", ")}` });
-    return;
-  }
-
   try {
-    const currentState = await db
-      .select()
-      .from(brickStateTable)
-      .where(eq(brickStateTable.color, color))
-      .limit(1);
+    const result = await db.transaction(async (tx) => {
+      const currentState = await tx
+        .select()
+        .from(brickStateTable)
+        .where(eq(brickStateTable.color, color))
+        .limit(1);
 
-    if (currentState.length === 0) {
-      res.status(404).json({ error: "Brick not found" });
-      return;
-    }
+      if (currentState.length === 0) {
+        return { error: "Brick not found", status: 404 as const };
+      }
 
-    const current = currentState[0];
+      const current = currentState[0];
 
-    if (current.holder === to) {
-      res.status(400).json({ error: "Cannot transfer brick to the current holder" });
-      return;
-    }
+      if (current.holder === to) {
+        return { error: "Cannot transfer brick to the current holder", status: 400 as const };
+      }
 
-    const [updated] = await db
-      .update(brickStateTable)
-      .set({ holder: to, updatedAt: new Date() })
-      .where(eq(brickStateTable.color, color))
-      .returning();
+      const [row] = await tx
+        .update(brickStateTable)
+        .set({ holder: to, updatedAt: new Date() })
+        .where(eq(brickStateTable.color, color))
+        .returning();
 
-    await db.insert(transferHistoryTable).values({
-      color,
-      fromHolder: current.holder,
-      toHolder: to,
+      await tx.insert(transferHistoryTable).values({
+        color,
+        fromHolder: current.holder,
+        toHolder: to,
+      });
+
+      return { data: row };
     });
 
+    if ("error" in result) {
+      res.status(result.status!).json({ error: result.error });
+      return;
+    }
+
     res.json({
-      color: updated.color,
-      holder: updated.holder,
-      updatedAt: updated.updatedAt.toISOString(),
+      color: result.data.color,
+      holder: result.data.holder,
+      updatedAt: result.data.updatedAt.toISOString(),
     });
   } catch (err) {
     req.log.error({ err }, "Failed to transfer brick");

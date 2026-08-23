@@ -16,6 +16,11 @@ const fr = {
     empty: "Aucun transfert enregistré.",
   },
   loading: "Chargement du Système...",
+  transferFailed: "Échec du transfert",
+  notFound: {
+    title: "404 Page introuvable",
+    description: "La page que vous cherchez n'existe pas.",
+  },
 } as const;
 
 export default fr;

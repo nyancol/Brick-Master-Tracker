@@ -15,10 +15,4 @@ await build({
   sourcemap: "linked",
   packages: "external",
   logLevel: "info",
-  banner: {
-    // node --import tsx style loader isn't needed in prod; just ensure
-    // .js extension on the relative imports between our own files works
-    // when Node resolves the bundled output.
-    js: "",
-  },
 });

@@ -8,7 +8,7 @@
  * persists the file across container recreations.
  */
 import { mkdirSync } from "node:fs";
-import { dirname, isAbsolute } from "node:path";
+import { dirname, resolve } from "node:path";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
 import * as schema from "./schema.js";
@@ -18,7 +18,7 @@ const dbPath = process.env.DB_PATH ?? "./brick.db";
 // Make sure the parent directory exists. better-sqlite3 will not create it
 // itself, and we want this to "just work" whether DB_PATH is "./brick.db",
 // "./data/brick.db", or "/app/deploy/data/brick.db".
-mkdirSync(dirname(isAbsolute(dbPath) ? dbPath : `./${dbPath}`), { recursive: true });
+mkdirSync(dirname(resolve(dbPath)), { recursive: true });
 
 const sqlite = new Database(dbPath);
 

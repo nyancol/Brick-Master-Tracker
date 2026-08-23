@@ -5,8 +5,8 @@ import { format } from "date-fns";
 import { History, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
-
-const FRIENDS = ["Yann", "Anselme", "Thomas"];
+import { useToast } from "@/hooks/use-toast";
+import { FRIENDS } from "../../shared/constants";
 const LANGS = [
   { code: "en", label: "EN" },
   { code: "fr", label: "FR" },
@@ -14,6 +14,7 @@ const LANGS = [
 
 export default function Home() {
   const { t, i18n } = useTranslation();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: bricks, isLoading: bricksLoading } = useBricks();
   const { data: transfers, isLoading: transfersLoading } = useTransfers();
@@ -26,6 +27,13 @@ export default function Home() {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getBricksQueryKey });
           queryClient.invalidateQueries({ queryKey: getTransfersQueryKey });
+        },
+        onError: (error) => {
+          toast({
+            title: t("transferFailed"),
+            description: error.message,
+            variant: "destructive",
+          });
         },
       }
     );

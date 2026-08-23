@@ -16,6 +16,11 @@ const en = {
     empty: "No transfers recorded yet.",
   },
   loading: "Loading System...",
+  transferFailed: "Transfer failed",
+  notFound: {
+    title: "404 Page Not Found",
+    description: "The page you are looking for does not exist.",
+  },
 } as const;
 
 export default en;

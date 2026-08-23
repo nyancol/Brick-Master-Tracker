@@ -13,12 +13,17 @@ import app from "./app.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distDir = path.resolve(__dirname, "..", "dist", "public");
 
-// Serve built SPA assets (JS, CSS, images, fonts) for non-API paths.
-app.use(express.static(distDir));
+// In production we serve three things from a single Express instance:
+//  1. The API at /api/* (mounted from ./app)
+//  2. Static SPA assets
+//  3. SPA fallback (client-side routing via wouter)
+const server = express();
+server.use("/api", app);
+server.use(express.static(distDir));
 
 // SPA fallback: any GET that isn't an API call and didn't match a static file
 // returns index.html so client-side routing (wouter) can take over.
-app.use((req, res, next) => {
+server.use((req, res, next) => {
   if (req.path.startsWith("/api/") || req.path === "/api") return next();
   if (req.method !== "GET") return next();
   res.sendFile(path.join(distDir, "index.html"));
@@ -33,6 +38,6 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`Brick Tracker listening on :${port}`);
 });
