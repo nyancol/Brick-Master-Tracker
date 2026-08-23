@@ -3,23 +3,35 @@
   "version": "0.0.0",
   "license": "MIT",
   "private": true,
+  "type": "module",
   "scripts": {
-    "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
-    "build": "pnpm run typecheck && pnpm --filter @workspace/brick-tracker run build",
-    "typecheck": "pnpm --filter @workspace/brick-tracker run typecheck",
-    "dev": "pnpm --filter @workspace/brick-tracker run dev",
-    "start": "pnpm --filter @workspace/brick-tracker run start",
-    "db:push": "pnpm --filter @workspace/brick-tracker run db:push"
-  },
-  "devDependencies": {
-    "prettier": "^3.8.3",
-    "typescript": "~5.9.3"
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc --noEmit && vite build && node build-server.mjs",
+    "start": "node dist/server.mjs",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@tanstack/react-query": "catalog:",
-    "@types/pg": "^8.20.0",
-    "drizzle-orm": "catalog:",
-    "drizzle-zod": "^0.8.3",
-    "zod": "catalog:"
+    "better-sqlite3": "^11.7.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "date-fns": "^3.6.0",
+    "express": "^5.2.1",
+    "lucide-react": "^0.545.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "tailwind-merge": "^3.3.1",
+    "tailwindcss": "^4.1.14"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.14",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.2.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.4",
+    "esbuild": "^0.27.3",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.2"
   }
 }

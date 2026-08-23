@@ -9,6 +9,9 @@ pkgs.mkShellNoCC {
     pnpm
     git
     pi-coding-agent
+    gcc
+    gnumake
+    python3
   ];
   LOCALE_ARCHIVE = "${pkgs.glibcLocales}/lib/locale/locale-archive";
 }
