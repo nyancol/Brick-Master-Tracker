@@ -9,7 +9,7 @@ Built with React, Express, SQLite, and Tailwind CSS. Fully containerised, dark-t
 ## Architecture Overview
 
 ```mermaid
-flowchart TB
+graph TB
     subgraph Client["Browser (SPA)"]
         direction TB
         react["React 19 + Vite"]
