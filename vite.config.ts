@@ -2,6 +2,7 @@ import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
+import dotenv from "dotenv";
 
 /**
  * Vite plugin that mounts the Express API (server/app.ts) onto /api in dev.
@@ -13,6 +14,7 @@ function apiPlugin(): Plugin {
   return {
     name: "brick-tracker-api",
     async configureServer(server) {
+      dotenv.config();
       const mod = await server.ssrLoadModule("/server/app.ts");
       server.middlewares.use("/api", mod.default);
     },

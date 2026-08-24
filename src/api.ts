@@ -9,25 +9,45 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-// ── Types ──────────────────────────────────────────────────────────────────
-
 export type BrickColor = "red" | "blue";
 
 export interface BrickState {
   color: BrickColor;
-  holder: string;
+  holderId: number | null;
+  holderName: string;
+  holderAvatarUrl: string | null;
   updatedAt: string;
 }
 
 export interface Transfer {
   id: number;
   color: BrickColor;
-  fromHolder: string;
-  toHolder: string;
+  fromId: number;
+  fromName: string;
+  toId: number;
+  toName: string;
+  transferredById: number;
+  transferredByName: string;
   transferredAt: string;
 }
 
-// ── Data-fetching hook (replaces react-query for our 2 endpoints) ──────────
+export interface AuthUser {
+  id: number;
+  email: string;
+  displayName: string;
+  avatarUrl: string | null;
+}
+
+export interface UserEntry {
+  id: number;
+  displayName: string;
+  avatarUrl: string | null;
+}
+
+interface AuthMeResponse {
+  user: AuthUser;
+  users: UserEntry[];
+}
 
 interface DataState<T> {
   data: T | undefined;
@@ -69,11 +89,13 @@ export function useTransfers() {
   return useData<Transfer[]>("/api/transfers");
 }
 
-// ── Mutation (replaces react-query useMutation) ────────────────────────────
+export function useCurrentUser() {
+  return useData<AuthMeResponse>("/api/auth/me");
+}
 
 export async function transferBrick(
   color: BrickColor,
-  to: string,
+  to: number,
 ): Promise<BrickState> {
   return fetchJson<BrickState>(`/api/bricks/${color}/transfer`, {
     method: "POST",

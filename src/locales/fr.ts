@@ -17,6 +17,7 @@ const fr = {
   },
   loading: "Chargement du Système...",
   transferFailed: "Échec du transfert",
+  logout: "Déconnexion",
   notFound: {
     title: "404 Page introuvable",
     description: "La page que vous cherchez n'existe pas.",

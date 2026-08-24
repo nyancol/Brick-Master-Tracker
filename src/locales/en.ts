@@ -17,6 +17,7 @@ const en = {
   },
   loading: "Loading System...",
   transferFailed: "Transfer failed",
+  logout: "Sign out",
   notFound: {
     title: "404 Page Not Found",
     description: "The page you are looking for does not exist.",

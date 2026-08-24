@@ -1,18 +1,22 @@
 import { format } from "date-fns";
-import { History, ArrowRight, Loader2, AlertCircle } from "lucide-react";
+import { History, ArrowRight, Loader2, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useBricks, useTransfers, transferBrick } from "@/api";
+import { useBricks, useTransfers, transferBrick, type AuthUser, type UserEntry } from "@/api";
 import { useToast } from "@/hooks/use-toast";
 import { t, getLanguage, changeLanguage } from "@/hooks/use-translation";
-import { FRIENDS } from "../../shared/constants";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 
 const LANGS = [
   { code: "en", label: "EN" },
   { code: "fr", label: "FR" },
 ] as const;
 
-export default function Home() {
+interface Props {
+  user: AuthUser;
+  users: UserEntry[];
+}
+
+export default function Home({ user, users }: Props) {
   const [, forceRender] = useState(0);
   const { toast } = useToast();
   const { data: bricks, loading: bricksLoading, refetch: refetchBricks } = useBricks();
@@ -20,7 +24,7 @@ export default function Home() {
   const [pending, setPending] = useState(false);
 
   const handleTransfer = useCallback(
-    async (color: "red" | "blue", to: string) => {
+    async (color: "red" | "blue", to: number) => {
       setPending(true);
       try {
         await transferBrick(color, to);
@@ -47,6 +51,9 @@ export default function Home() {
   const redBrick = bricks?.find((b) => b.color === "red");
   const blueBrick = bricks?.find((b) => b.color === "blue");
 
+  const isRedHolder = redBrick?.holderId === user.id;
+  const isBlueHolder = blueBrick?.holderId === user.id;
+
   if (bricksLoading || transfersLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center space-y-4">
@@ -63,23 +70,29 @@ export default function Home() {
   return (
     <div className="min-h-screen w-full p-4 md:p-8 max-w-5xl mx-auto space-y-12">
       <header className="text-center space-y-4 mb-12">
-        <div className="flex justify-end gap-1 mb-2">
-          {LANGS.map((lang) => {
-            const active = getLanguage() === lang.code;
-            return (
-              <button
-                key={lang.code}
-                onClick={() => handleLangChange(lang.code)}
-                className={`font-mono text-xs px-3 py-1 rounded border transition-colors ${
-                  active
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
-                }`}
-              >
-                {lang.label}
-              </button>
-            );
-          })}
+        <div className="flex justify-between items-start mb-2">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground font-mono">
+            <User className="w-4 h-4" />
+            {user.displayName}
+          </div>
+          <div className="flex gap-1">
+            {LANGS.map((lang) => {
+              const active = getLanguage() === lang.code;
+              return (
+                <button
+                  key={lang.code}
+                  onClick={() => handleLangChange(lang.code)}
+                  className={`font-mono text-xs px-3 py-1 rounded border transition-colors ${
+                    active
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                  }`}
+                >
+                  {lang.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
         <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight uppercase">
           {title.split(" ").map((word, i) => (
@@ -121,26 +134,36 @@ export default function Home() {
                 {t("honor.heldBy")}
               </p>
               <div className="text-4xl font-black text-white py-2">
-                {redBrick?.holder || "Unknown"}
+                {redBrick?.holderName || "—"}
               </div>
             </div>
             <div className="w-full pt-4 mt-auto space-y-3 border-t border-red-500/20">
-              <p className="text-xs font-mono uppercase text-red-500/70 tracking-widest">
-                {t("honor.transferTo")}
-              </p>
-              <div className="flex gap-3 justify-center">
-                {FRIENDS.filter((f) => f !== redBrick?.holder).map((friend) => (
-                  <Button
-                    key={friend}
-                    variant="outline"
-                    className="flex-1 border-red-500/30 hover:bg-red-500 hover:text-white transition-colors"
-                    onClick={() => handleTransfer("red", friend)}
-                    disabled={pending}
-                  >
-                    {friend}
-                  </Button>
-                ))}
-              </div>
+              {isRedHolder ? (
+                <>
+                  <p className="text-xs font-mono uppercase text-red-500/70 tracking-widest">
+                    {t("honor.transferTo")}
+                  </p>
+                  <div className="flex gap-3 justify-center flex-wrap">
+                    {users
+                      .filter((u) => u.id !== user.id)
+                      .map((friend) => (
+                        <Button
+                          key={friend.id}
+                          variant="outline"
+                          className="flex-1 border-red-500/30 hover:bg-red-500 hover:text-white transition-colors"
+                          onClick={() => handleTransfer("red", friend.id)}
+                          disabled={pending}
+                        >
+                          {friend.displayName}
+                        </Button>
+                      ))}
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm font-mono text-red-500/50 uppercase tracking-widest">
+                  Waiting for {redBrick?.holderName || "someone"} to transfer…
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -165,31 +188,50 @@ export default function Home() {
                 {t("shame.cursedUpon")}
               </p>
               <div className="text-4xl font-black text-white py-2">
-                {blueBrick?.holder || "Unknown"}
+                {blueBrick?.holderName || "—"}
               </div>
             </div>
             <div className="w-full pt-4 mt-auto space-y-3 border-t border-cyan-500/20">
-              <p className="text-xs font-mono uppercase text-cyan-500/70 tracking-widest">
-                {t("shame.offloadTo")}
-              </p>
-              <div className="flex gap-3 justify-center">
-                {FRIENDS.filter((f) => f !== blueBrick?.holder).map(
-                  (friend) => (
-                    <Button
-                      key={friend}
-                      variant="outline"
-                      className="flex-1 border-cyan-500/30 hover:bg-cyan-500 hover:text-white transition-colors"
-                      onClick={() => handleTransfer("blue", friend)}
-                      disabled={pending}
-                    >
-                      {friend}
-                    </Button>
-                  ),
-                )}
-              </div>
+              {isBlueHolder ? (
+                <>
+                  <p className="text-xs font-mono uppercase text-cyan-500/70 tracking-widest">
+                    {t("shame.offloadTo")}
+                  </p>
+                  <div className="flex gap-3 justify-center flex-wrap">
+                    {users
+                      .filter((u) => u.id !== user.id)
+                      .map((friend) => (
+                        <Button
+                          key={friend.id}
+                          variant="outline"
+                          className="flex-1 border-cyan-500/30 hover:bg-cyan-500 hover:text-white transition-colors"
+                          onClick={() => handleTransfer("blue", friend.id)}
+                          disabled={pending}
+                        >
+                          {friend.displayName}
+                        </Button>
+                      ))}
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm font-mono text-cyan-500/50 uppercase tracking-widest">
+                  Waiting for {blueBrick?.holderName || "someone"} to transfer…
+                </p>
+              )}
             </div>
           </div>
         </div>
+      </div>
+
+      {/* User footer */}
+      <div className="flex justify-center">
+        <a
+          href="/api/auth/logout"
+          className="flex items-center gap-2 font-mono text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <LogOut className="w-4 h-4" />
+          {t("logout")}
+        </a>
       </div>
 
       {/* Transfer History */}
@@ -223,11 +265,11 @@ export default function Home() {
                   />
                   <div className="flex items-center gap-3 font-mono text-sm md:text-base">
                     <span className="text-muted-foreground">
-                      {transfer.fromHolder}
+                      {transfer.fromName}
                     </span>
                     <ArrowRight className="w-4 h-4 text-muted-foreground/50" />
                     <span className="font-bold text-foreground">
-                      {transfer.toHolder}
+                      {transfer.toName}
                     </span>
                   </div>
                 </div>
