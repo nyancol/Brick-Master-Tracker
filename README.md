@@ -1,8 +1,8 @@
 # Brick Master Tracker
 
-A full-stack tracking app for two legendary Lego bricks — the **Brick of Honor** and the **Brick of Shame** — passed between friends.
+A full-stack tracking app for two legendary Lego bricks — the **Brick of Honor** and the **Brick of Shame** — passed between three friends (Yann, Anselme, and Thomas). Each brick has a current holder, and every transfer is recorded in a public ledger. Dark-themed, with full English and French localization.
 
-Built with React, Express, SQLite, and Tailwind CSS. Dark-themed, i18n-ready (EN/FR).
+Built with React 19, Express 5, SQLite (better-sqlite3), and Tailwind CSS v4.
 
 ---
 
