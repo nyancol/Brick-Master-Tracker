@@ -6,9 +6,10 @@ in
 pkgs.mkShellNoCC {
   packages = with pkgs; [
     nodejs_22
+    openspec
     pnpm
     git
-    pi-coding-agent
+    opencode
     gcc
     gnumake
     python3
