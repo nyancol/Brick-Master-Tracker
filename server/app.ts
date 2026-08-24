@@ -153,7 +153,7 @@ app.get("/auth/callback", async (req, res) => {
         : req.protocol + "://" + req.get("host") + req.originalUrl,
     );
     const user = await handleCallback(callbackUrl, stored);
-    req.session.user = { id: user.id, email: user.email, idToken: user.idToken };
+    req.session.user = { id: user.id, email: user.email };
     req.session.save((err) => {
       if (err) {
         console.error("Session save failed:", err);
@@ -174,7 +174,7 @@ app.get("/auth/callback", async (req, res) => {
 app.get("/auth/logout", (req, res) => {
   req.session.destroy((err) => {
     if (err) {
-      console.error("Session destroy failed:", err);
+      console.error("Logout failed:", err);
     }
     res.redirect("/");
   });
