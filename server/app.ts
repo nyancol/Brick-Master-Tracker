@@ -146,8 +146,11 @@ app.get("/auth/callback", async (req, res) => {
   }
 
   try {
+    const appUrl = process.env.APP_URL;
     const callbackUrl = new URL(
-      req.protocol + "://" + req.get("host") + req.originalUrl,
+      appUrl
+        ? `${appUrl.replace(/\/+$/, "")}${req.originalUrl}`
+        : req.protocol + "://" + req.get("host") + req.originalUrl,
     );
     const user = await handleCallback(callbackUrl, stored);
     req.session.user = { id: user.id, email: user.email };

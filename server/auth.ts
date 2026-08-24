@@ -23,7 +23,7 @@ export async function initOidc(): Promise<void> {
   if (!issuerUrl || !clientId || !clientSecret) {
     discoveryError = "Missing OIDC configuration.";
     console.warn(
-      "OIDC not configured — set OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, OIDC_REDIRECT_URL",
+      "OIDC not configured — set OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, and either APP_URL or OIDC_REDIRECT_URL",
     );
     return;
   }
@@ -68,7 +68,10 @@ export async function generateAuthUrl(): Promise<string> {
     code_challenge_method: "S256",
   };
 
-  const redirectUri = process.env.OIDC_REDIRECT_URL;
+  const appUrl = process.env.APP_URL;
+  const redirectUri =
+    appUrl ? `${appUrl.replace(/\/+$/, "")}/api/auth/callback`
+    : process.env.OIDC_REDIRECT_URL;
   if (redirectUri) {
     params.redirect_uri = redirectUri;
   }
