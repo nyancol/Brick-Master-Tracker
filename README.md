@@ -232,6 +232,30 @@ pnpm build
 PORT=5000 pnpm start
 ```
 
+### Before submitting a change
+
+Run through this checklist every time you open a PR or push a commit:
+
+1. **Type-check** — ensure no TypeScript errors:
+   ```bash
+   pnpm typecheck
+   ```
+
+2. **Build** — verify the production bundle compiles cleanly:
+   ```bash
+   pnpm build
+   ```
+
+3. **Dev smoke test** — start the dev server and manually test the change:
+   ```bash
+   pnpm dev
+   ```
+
+4. **Bump version** — update the `version` field in `package.json` (semver):
+   - **patch** (`0.0.x`): bug fixes, small UI tweaks
+   - **minor** (`0.x.0`): new features, new routes
+   - **major** (`x.0.0`): breaking API or DB schema changes
+
 ### Working with the database
 
 The database is created automatically on first request. No migration or seed commands needed:
