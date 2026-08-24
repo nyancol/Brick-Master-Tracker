@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from "react";
-import { X, Upload, Check, AlertCircle, Loader2 } from "lucide-react";
+import { X, Scroll, Check, ShieldAlert, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Ornament } from "@/components/ui/ornament";
 import { t } from "@/hooks/use-translation";
 import { uploadStagingImage, deleteStagingImage, type StagingImage, type BrickColor } from "@/api";
 
@@ -104,10 +105,11 @@ export default function TransferModal({ color, recipientName, onConfirm, onCance
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-lg bg-card border border-border rounded-2xl p-6 space-y-6 shadow-2xl">
+      <div className="relative w-full max-w-lg bg-card border border-gold/40 rounded-sm p-6 space-y-6 shadow-2xl animate-seal-stamp">
+        <Ornament position="top-left" size="sm" />
+        <Ornament position="top-right" size="sm" />
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold uppercase tracking-wide">
-            {color === "red" ? "🔴 " : "🔵 "}
+          <h2 className="text-xl font-display font-bold uppercase tracking-wide text-gold">
             {t("honor.transferTo")} {recipientName}
           </h2>
           <button
@@ -119,13 +121,13 @@ export default function TransferModal({ color, recipientName, onConfirm, onCance
         </div>
 
         <div className="space-y-2">
-          <label className="block text-sm font-mono uppercase text-muted-foreground">
+          <label className="block text-sm font-mono uppercase text-muted-foreground tracking-wider">
             {t("modal.descriptionLabel")}
           </label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="w-full h-32 bg-muted border border-border rounded-xl p-4 text-foreground font-mono text-sm resize-none focus:outline-none focus:border-primary/50 transition-colors"
+            className="w-full h-32 bg-muted border border-border rounded-sm p-4 text-foreground font-serif text-sm resize-none focus:outline-none focus:border-gold/50 transition-colors"
             placeholder={t("modal.descriptionLabel")}
           />
           {!description.trim() && (
@@ -148,22 +150,22 @@ export default function TransferModal({ color, recipientName, onConfirm, onCance
             variant="outline"
             onClick={() => fileInputRef.current?.click()}
           >
-            <Upload className="w-4 h-4 mr-2" />
+            <Scroll className="w-4 h-4 mr-2" />
             {t("modal.uploadPhoto")}
           </Button>
 
           {images.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {images.map((img, idx) => (
-                <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-border group">
+                <div key={idx} className="relative w-20 h-20 rounded-sm overflow-hidden border border-gold/30 group">
                   {img.status === "done" && (
                     <>
                       <img src={img.preview} alt="" className="w-full h-full object-cover" />
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <Check className="w-5 h-5 text-green-400" />
+                        <Check className="w-5 h-5 text-gold" />
                       </div>
                       <button
-                        className="absolute top-1 right-1 bg-black/60 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute top-1 right-1 bg-black/60 rounded-sm p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                         onClick={() => handleRemoveImage(img)}
                       >
                         <X className="w-3 h-3 text-white" />
@@ -177,7 +179,7 @@ export default function TransferModal({ color, recipientName, onConfirm, onCance
                   )}
                   {img.status === "error" && (
                     <div className="w-full h-full flex items-center justify-center bg-muted">
-                      <AlertCircle className="w-5 h-5 text-red-400" />
+                      <ShieldAlert className="w-5 h-5 text-destructive" />
                     </div>
                   )}
                 </div>

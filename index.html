@@ -6,6 +6,14 @@
     <title>Brick Master Tracker</title>
     <meta name="description" content="Track the legendary bricks of Honor and Shame as they pass between friends." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      (function() {
+        var theme = localStorage.getItem('theme');
+        if (theme === 'dark' || (theme !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

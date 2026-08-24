@@ -1,4 +1,5 @@
 import { Toaster } from "@/components/ui/toaster";
+import { ThemeProvider } from "@/components/theme-provider";
 import { useCurrentUser } from "@/api";
 import Home from "@/pages/home";
 import Login from "@/pages/login";
@@ -18,17 +19,17 @@ export default function App() {
 
   if (!data?.user) {
     return (
-      <>
+      <ThemeProvider>
         <Login />
         <Toaster />
-      </>
+      </ThemeProvider>
     );
   }
 
   return (
-    <>
+    <ThemeProvider>
       <Home user={data.user} users={data.users} />
       <Toaster />
-    </>
+    </ThemeProvider>
   );
 }

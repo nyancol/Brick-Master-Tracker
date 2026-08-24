@@ -1,10 +1,26 @@
 import { useState, useCallback } from "react";
 import { format } from "date-fns";
-import { BookOpen, ArrowRight, ChevronDown, ChevronUp, Pencil, Upload, Trash2 } from "lucide-react";
+import { ScrollText, ArrowRight, ChevronDown, ChevronUp, Feather, Scroll, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTransfers, fetchTransferStory, editStory, uploadTransferImage, deleteTransferImage, type Transfer, type TransferStory, type TransferImage, type AuthUser } from "@/api";
 import { t } from "@/hooks/use-translation";
 import { useToast } from "@/hooks/use-toast";
+
+function toRoman(num: number): string {
+  const map: [number, string][] = [
+    [1000, "M"], [900, "CM"], [500, "D"], [400, "CD"],
+    [100, "C"], [90, "XC"], [50, "L"], [40, "XL"],
+    [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"],
+  ];
+  let result = "";
+  for (const [value, numeral] of map) {
+    while (num >= value) {
+      result += numeral;
+      num -= value;
+    }
+  }
+  return result;
+}
 
 interface Props {
   currentUser: AuthUser;
@@ -23,15 +39,15 @@ export default function ChroniclesView({ currentUser }: Props) {
 
   if (!transfers || transfers.length === 0) {
     return (
-      <div className="mt-16 pt-8 border-t border-border">
-        <div className="flex items-center gap-3 mb-8">
-          <BookOpen className="w-6 h-6 text-muted-foreground" />
-          <h3 className="text-xl font-bold uppercase tracking-wider">
+      <div>
+        <div className="flex items-center gap-3 mb-8 pb-3 border-b-2 border-gold/30">
+          <ScrollText className="w-6 h-6 text-gold" />
+          <h3 className="text-xl font-bold font-display uppercase tracking-wider text-gold">
             {t("chronicles.title")}
           </h3>
         </div>
-        <div className="text-center py-12 bg-muted/30 rounded-2xl border border-dashed border-muted">
-          <p className="font-mono text-muted-foreground">
+        <div className="text-center py-12 bg-card rounded-sm border border-border outline outline-1 outline-border -outline-offset-1">
+          <p className="font-serif text-muted-foreground italic">
             {t("chronicles.empty")}
           </p>
         </div>
@@ -49,10 +65,10 @@ export default function ChroniclesView({ currentUser }: Props) {
   const years = Array.from(grouped.keys()).sort((a, b) => b - a);
 
   return (
-    <div className="mt-16 pt-8 border-t border-border">
-      <div className="flex items-center gap-3 mb-8">
-        <BookOpen className="w-6 h-6 text-muted-foreground" />
-        <h3 className="text-xl font-bold uppercase tracking-wider">
+    <div className="pt-8">
+      <div className="flex items-center gap-3 mb-8 pb-3 border-b-2 border-gold/30">
+        <ScrollText className="w-6 h-6 text-gold" />
+        <h3 className="text-xl font-bold font-display uppercase tracking-wider text-gold">
           {t("chronicles.title")}
         </h3>
       </div>
@@ -60,9 +76,13 @@ export default function ChroniclesView({ currentUser }: Props) {
       <div className="space-y-12">
         {years.map((year) => (
           <div key={year}>
-            <h4 className="text-lg font-bold text-muted-foreground mb-4 uppercase tracking-widest font-mono">
-              {year}
-            </h4>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="h-px flex-1 bg-gradient-to-r from-gold/50 to-gold/10" />
+              <h4 className="font-mono text-sm text-gold/80 uppercase tracking-[0.3em]">
+                ANNO DOMINI {toRoman(year)}
+              </h4>
+              <div className="h-px flex-1 bg-gradient-to-r from-gold/10 to-gold/50" />
+            </div>
             <div className="space-y-4">
               {grouped.get(year)!.map((transfer) => (
                 <ChronicleEntry
@@ -113,22 +133,18 @@ function ChronicleEntry({
   }, [expanded, story, transfer.id]);
 
   return (
-    <div className="rounded-xl bg-card border border-border hover:border-primary/30 transition-colors overflow-hidden">
+    <div className="rounded-sm bg-card border border-border outline outline-1 outline-border -outline-offset-1 hover:border-gold/30 transition-colors overflow-hidden">
       <button
         onClick={handleToggle}
         className="w-full flex items-center justify-between p-4 text-left"
       >
         <div className="flex items-center gap-4">
-          <div
-            className={`w-3 h-3 rounded-full ${
-              transfer.color === "red"
-                ? "bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.8)]"
-                : "bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.8)]"
-            }`}
-          />
+          <span className="text-xs font-mono text-gold/60">
+            {transfer.color === "red" ? "✦" : "✦"}
+          </span>
           <div className="flex items-center gap-3 font-mono text-sm md:text-base">
             <span className="text-muted-foreground">{transfer.fromName}</span>
-            <ArrowRight className="w-4 h-4 text-muted-foreground/50" />
+            <ArrowRight className="w-4 h-4 text-gold/40" />
             <span className="font-bold text-foreground">{transfer.toName}</span>
           </div>
         </div>
@@ -145,7 +161,7 @@ function ChronicleEntry({
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 border-t border-border pt-4 space-y-4">
+        <div className="px-4 pb-4 border-t border-border pt-4 space-y-4 animate-unfurl">
           {loading ? (
             <p className="font-mono text-sm text-muted-foreground">{t("loading")}</p>
           ) : story ? (
@@ -159,7 +175,7 @@ function ChronicleEntry({
                   onUpdate={(updated) => setStory((s) => s ? { ...s, ...updated } : s)}
                 />
               ) : (
-                <p className="font-mono text-sm text-muted-foreground italic">
+                <p className="font-serif text-sm text-muted-foreground italic">
                   No description for this transfer.
                 </p>
               )}
@@ -226,7 +242,7 @@ function StoryDisplay({
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
-          className="w-full h-24 bg-muted border border-border rounded-xl p-3 text-foreground font-mono text-sm resize-none focus:outline-none focus:border-primary/50 transition-colors"
+          className="w-full h-24 bg-muted border border-border rounded-sm p-3 text-foreground font-serif text-sm resize-none focus:outline-none focus:border-gold/50 transition-colors"
         />
         <div className="flex gap-2">
           <Button size="sm" onClick={handleSave} disabled={!text.trim()}>
@@ -250,13 +266,13 @@ function StoryDisplay({
   return (
     <div className="space-y-2">
       <div className="flex items-start justify-between gap-2">
-        <p className="font-mono text-sm leading-relaxed">{story.description}</p>
+        <p className="font-serif italic text-sm leading-relaxed">{story.description}</p>
         {isSender && (
           <button
             onClick={() => setEditing(true)}
             className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
           >
-            <Pencil className="w-4 h-4" />
+            <Feather className="w-4 h-4" />
           </button>
         )}
       </div>
@@ -337,7 +353,7 @@ function PhotoGallery({
       {images.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {images.map((img) => (
-            <div key={img.id} className="relative w-24 h-24 rounded-lg overflow-hidden border border-border group">
+            <div key={img.id} className="relative w-24 h-24 rounded-sm overflow-hidden border border-gold/40 group">
               <a
                 href={`/api/uploads/${img.filename}`}
                 target="_blank"
@@ -351,7 +367,7 @@ function PhotoGallery({
               </a>
               {isSender && (
                 <button
-                  className="absolute top-1 right-1 bg-black/60 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute top-1 right-1 bg-black/60 rounded-sm p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                   onClick={() => handleDelete(img.id)}
                 >
                   <Trash2 className="w-3 h-3 text-white" />
@@ -379,7 +395,7 @@ function PhotoGallery({
               input.click();
             }}
           >
-            <Upload className="w-3 h-3 mr-1" />
+            <Scroll className="w-3 h-3 mr-1" />
             {uploading ? t("modal.uploading") : t("modal.uploadPhoto")}
           </Button>
         </>

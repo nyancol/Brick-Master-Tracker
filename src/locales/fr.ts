@@ -14,7 +14,7 @@ const fr = {
     waitingForTransfer: "En attente que {name} transfère…",
   },
   chronicles: {
-    title: "Chroniques des Briques",
+    title: "Épopées des Briques",
     empty: "Aucune entrée enregistrée.",
     chapter: "Chapitre",
     editedBy: "Modifié par",
