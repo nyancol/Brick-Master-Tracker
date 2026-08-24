@@ -1,5 +1,5 @@
 import * as client from "openid-client";
-import type { Configuration, TokenEndpointResponseHelpers } from "openid-client";
+import type { Configuration } from "openid-client";
 import { randomBytes } from "node:crypto";
 import db from "./db.js";
 import type { User, SessionUser } from "../shared/types.js";
@@ -62,6 +62,7 @@ export async function generateAuthUrl(): Promise<string> {
 
   const params: Record<string, string> = {
     scope: "openid profile email",
+    prompt: "login",
     state,
     nonce,
     code_challenge: codeChallenge,
@@ -88,6 +89,20 @@ export function consumeState(state: string): StoredParams | undefined {
   return result;
 }
 
+export function buildLogoutUrl(idToken: string): URL | null {
+  if (!oidcConfig) return null;
+
+  const appUrl = process.env.APP_URL;
+  const postLogoutRedirectUri = appUrl
+    ? `${appUrl.replace(/\/+$/, "")}/`
+    : undefined;
+
+  return client.buildEndSessionUrl(oidcConfig, {
+    id_token_hint: idToken,
+    ...(postLogoutRedirectUri ? { post_logout_redirect_uri: postLogoutRedirectUri } : {}),
+  });
+}
+
 export async function handleCallback(
   currentUrl: URL,
   stored: StoredParams,
@@ -96,7 +111,7 @@ export async function handleCallback(
     throw new Error("OIDC client not initialized");
   }
 
-  const tokenSet = (await client.authorizationCodeGrant(
+  const tokenSet = await client.authorizationCodeGrant(
     oidcConfig,
     currentUrl,
     {
@@ -104,7 +119,7 @@ export async function handleCallback(
       expectedNonce: stored.nonce,
       pkceCodeVerifier: stored.codeVerifier,
     },
-  )) as TokenEndpointResponseHelpers;
+  );
 
   const claims = tokenSet.claims();
   if (!claims) {
@@ -123,7 +138,7 @@ export async function handleCallback(
   const user = upsertUser(sub, email, name, picture);
   maybeBootstrapBricks(user);
 
-  return { id: user.id, email: user.email };
+  return { id: user.id, email: user.email, idToken: tokenSet.id_token };
 }
 
 export function upsertUser(

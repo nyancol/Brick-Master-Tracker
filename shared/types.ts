@@ -10,6 +10,7 @@ export interface User {
 export interface SessionUser {
   id: number;
   email: string;
+  idToken?: string;
 }
 
 export interface BrickState {
