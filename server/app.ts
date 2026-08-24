@@ -1,5 +1,9 @@
 import express from "express";
 import session from "express-session";
+import multer from "multer";
+import { v4 as uuidv4 } from "uuid";
+import { mkdirSync, unlinkSync, existsSync } from "node:fs";
+import { join, resolve, extname } from "node:path";
 import createSqliteStore from "better-sqlite3-session-store";
 import db from "./db.js";
 import {
@@ -14,6 +18,43 @@ import {
 } from "./auth.js";
 
 const SqliteStore = createSqliteStore(session);
+
+const dataPath = process.env.DATA_PATH ?? "./data";
+const uploadsDir = resolve(dataPath, "uploads");
+mkdirSync(uploadsDir, { recursive: true });
+
+const VALID_MIME = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+]);
+
+const MIME_TO_EXT: Record<string, string> = {
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/webp": ".webp",
+  "image/gif": ".gif",
+};
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadsDir),
+    filename: (_req, _file, cb) => {
+      const uuid = uuidv4();
+      const ext = MIME_TO_EXT[_req.file?.mimetype ?? ""] ?? "";
+      cb(null, `${uuid}${ext}`);
+    },
+  }),
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (VALID_MIME.has(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Unsupported image format. Accepted: JPEG, PNG, WebP, GIF"));
+    }
+  },
+});
 
 const app = express();
 
@@ -183,7 +224,7 @@ app.get("/bricks", (_req, res) => {
   }
 });
 
-// GET /transfers
+// GET /transfers — basic metadata only
 app.get("/transfers", (_req, res) => {
   try {
     const rows = db
@@ -228,10 +269,121 @@ app.get("/transfers", (_req, res) => {
   }
 });
 
+// GET /transfers/:id/story — full story details
+app.get("/transfers/:id/story", (req, res) => {
+  try {
+    const story = db
+      .prepare(
+        `SELECT ts.description, ts.edited_by, ts.edited_at,
+                eu.display_name as edited_by_name
+         FROM transfer_story ts
+         LEFT JOIN users eu ON ts.edited_by = eu.id
+         WHERE ts.transfer_id = ?`,
+      )
+      .get(Number(req.params.id)) as {
+      description: string;
+      edited_by: number;
+      edited_at: number;
+      edited_by_name: string | null;
+    } | undefined;
+
+    const images = db
+      .prepare(
+        "SELECT id, filename, original_name, mime_type, uploaded_at FROM transfer_images WHERE transfer_id = ? ORDER BY uploaded_at ASC",
+      )
+      .all(Number(req.params.id)) as Array<{
+      id: number;
+      filename: string;
+      original_name: string;
+      mime_type: string;
+      uploaded_at: number;
+    }>;
+
+    if (!story) {
+      res.json({ description: null, editedBy: null, editedByName: null, editedAt: null, images: [] });
+      return;
+    }
+
+    res.json({
+      description: story.description,
+      editedBy: story.edited_by,
+      editedByName: story.edited_by_name ?? "Unknown",
+      editedAt: new Date(story.edited_at).toISOString(),
+      images: images.map((img) => ({
+        id: img.id,
+        filename: img.filename,
+        originalName: img.original_name,
+        mimeType: img.mime_type,
+        uploadedAt: new Date(img.uploaded_at).toISOString(),
+      })),
+    });
+  } catch (err) {
+    console.error("GET /transfers/:id/story failed:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PUT /transfers/:id/story — upsert description (sender only, non-empty)
+app.put("/transfers/:id/story", requireAuth, (req, res) => {
+  try {
+    const transferId = Number(req.params.id);
+    const { description } = req.body;
+    const userId = req.session.user!.id;
+
+    if (!description || typeof description !== "string" || !description.trim()) {
+      res.status(400).json({ error: "Description must be a non-empty string" });
+      return;
+    }
+
+    const transfer = db
+      .prepare("SELECT from_id FROM transfer_history WHERE id = ?")
+      .get(transferId) as { from_id: number } | undefined;
+
+    if (!transfer) {
+      res.status(404).json({ error: "Transfer not found" });
+      return;
+    }
+
+    if (transfer.from_id !== userId) {
+      res.status(403).json({ error: "Only the sender can edit the story" });
+      return;
+    }
+
+    const now = Date.now();
+    const existing = db
+      .prepare("SELECT transfer_id FROM transfer_story WHERE transfer_id = ?")
+      .get(transferId);
+
+    if (existing) {
+      db.prepare(
+        "UPDATE transfer_story SET description = ?, edited_by = ?, edited_at = ? WHERE transfer_id = ?",
+      ).run(description, userId, now, transferId);
+    } else {
+      db.prepare(
+        "INSERT INTO transfer_story (transfer_id, description, edited_by, edited_at, created_at) VALUES (?, ?, ?, ?, ?)",
+      ).run(transferId, description, userId, now, now);
+    }
+
+    const user = db
+      .prepare("SELECT display_name FROM users WHERE id = ?")
+      .get(userId) as { display_name: string };
+
+    res.json({
+      description,
+      editedBy: userId,
+      editedByName: user.display_name,
+      editedAt: new Date(now).toISOString(),
+    });
+  } catch (err) {
+    console.error("PUT /transfers/:id/story failed:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // POST /bricks/:color/transfer
 app.post("/bricks/:color/transfer", requireAuth, (req, res) => {
   const color = req.params.color as string;
-  const { to } = req.body;
+  const { to, description, imageIds } = req.body;
 
   if (!VALID_COLORS.has(color)) {
     res.status(400).json({ error: "Invalid brick color" });
@@ -243,6 +395,12 @@ app.post("/bricks/:color/transfer", requireAuth, (req, res) => {
     return;
   }
 
+  if (!description || typeof description !== "string" || !description.trim()) {
+    res.status(400).json({ error: "Description is required" });
+    return;
+  }
+
+  const picIds: number[] = Array.isArray(imageIds) ? imageIds : [];
   const currentUserId = req.session.user!.id;
 
   type TxResult =
@@ -291,12 +449,25 @@ app.post("/bricks/:color/transfer", requireAuth, (req, res) => {
       db.prepare(
         "UPDATE brick_state SET holder_id = ?, updated_at = ? WHERE color = ?",
       ).run(to, now, color);
-      db.prepare(
+      const info = db.prepare(
         "INSERT INTO transfer_history (color, from_id, to_id, transferred_by_id, transferred_at) VALUES (?, ?, ?, ?, ?)",
       ).run(color, current.holder_id, to, currentUserId, now);
 
+      const transferId = info.lastInsertRowid as number;
+
+      db.prepare(
+        "INSERT INTO transfer_story (transfer_id, description, edited_by, edited_at, created_at) VALUES (?, ?, ?, ?, ?)",
+      ).run(transferId, description, currentUserId, now, now);
+
+      for (const imgId of picIds) {
+        db.prepare(
+          "UPDATE transfer_images SET transfer_id = ? WHERE id = ? AND transfer_id IS NULL AND uploaded_by = ?",
+        ).run(transferId, imgId, currentUserId);
+      }
+
       return {
         data: {
+          transferId,
           color,
           holderId: to,
           holderName: recipient.display_name,
@@ -314,6 +485,205 @@ app.post("/bricks/:color/transfer", requireAuth, (req, res) => {
     res.json(result.data);
   } catch (err) {
     console.error("POST transfer failed:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/uploads/staging — upload image before transfer exists
+app.post("/uploads/staging", requireAuth, (req, res) => {
+  upload.single("file")(req, res, (err) => {
+    if (err) {
+      if (err instanceof multer.MulterError) {
+        if (err.code === "LIMIT_FILE_SIZE") {
+          res.status(400).json({ error: "File too large. Maximum size is 50 MB." });
+          return;
+        }
+        res.status(400).json({ error: err.message });
+        return;
+      }
+      res.status(400).json({ error: err.message });
+      return;
+    }
+
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ error: "No image file provided" });
+      return;
+    }
+
+    const userId = req.session.user!.id;
+    const now = Date.now();
+    const info = db.prepare(
+      "INSERT INTO transfer_images (transfer_id, filename, original_name, mime_type, uploaded_by, uploaded_at) VALUES (NULL, ?, ?, ?, ?, ?)",
+    ).run(file.filename, file.originalname, file.mimetype, userId, now);
+
+    res.json({
+      id: info.lastInsertRowid as number,
+      filename: file.filename,
+      originalName: file.originalname,
+      mimeType: file.mimetype,
+    });
+  });
+});
+
+// DELETE /api/uploads/staging/:id — remove staging image
+app.delete("/uploads/staging/:id", requireAuth, (req, res) => {
+  try {
+    const imgId = Number(req.params.id);
+    const userId = req.session.user!.id;
+
+    const img = db
+      .prepare("SELECT id, filename, uploaded_by, transfer_id FROM transfer_images WHERE id = ?")
+      .get(imgId) as { id: number; filename: string; uploaded_by: number; transfer_id: number | null } | undefined;
+
+    if (!img) {
+      res.status(404).json({ error: "Image not found" });
+      return;
+    }
+
+    if (img.uploaded_by !== userId) {
+      res.status(403).json({ error: "Only the uploader can delete this image" });
+      return;
+    }
+
+    if (img.transfer_id !== null) {
+      res.status(400).json({ error: "Image is already associated with a transfer. Use DELETE /api/transfers/:id/images/:imageId instead." });
+      return;
+    }
+
+    const filePath = join(uploadsDir, img.filename);
+    if (existsSync(filePath)) {
+      unlinkSync(filePath);
+    }
+    db.prepare("DELETE FROM transfer_images WHERE id = ?").run(imgId);
+
+    res.json({ deleted: true });
+  } catch (err) {
+    console.error("DELETE /uploads/staging/:id failed:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /api/transfers/:id/images — upload image to existing transfer
+app.post("/transfers/:id/images", requireAuth, (req, res) => {
+  upload.single("file")(req, res, (err) => {
+    if (err) {
+      if (err instanceof multer.MulterError) {
+        if (err.code === "LIMIT_FILE_SIZE") {
+          res.status(400).json({ error: "File too large. Maximum size is 50 MB." });
+          return;
+        }
+        res.status(400).json({ error: err.message });
+        return;
+      }
+      res.status(400).json({ error: err.message });
+      return;
+    }
+
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ error: "No image file provided" });
+      return;
+    }
+
+    const userId = req.session.user!.id;
+    const transferId = Number(req.params.id);
+
+    const transfer = db
+      .prepare("SELECT from_id FROM transfer_history WHERE id = ?")
+      .get(transferId) as { from_id: number } | undefined;
+
+    if (!transfer) {
+      res.status(404).json({ error: "Transfer not found" });
+      return;
+    }
+
+    if (transfer.from_id !== userId) {
+      res.status(403).json({ error: "Only the sender can upload images" });
+      return;
+    }
+
+    const now = Date.now();
+    const info = db.prepare(
+      "INSERT INTO transfer_images (transfer_id, filename, original_name, mime_type, uploaded_by, uploaded_at) VALUES (?, ?, ?, ?, ?, ?)",
+    ).run(transferId, file.filename, file.originalname, file.mimetype, userId, now);
+
+    res.json({
+      id: info.lastInsertRowid as number,
+      filename: file.filename,
+      originalName: file.originalname,
+      mimeType: file.mimetype,
+      uploadedAt: new Date(now).toISOString(),
+    });
+  });
+});
+
+// DELETE /api/transfers/:id/images/:imageId
+app.delete("/transfers/:id/images/:imageId", requireAuth, (req, res) => {
+  try {
+    const transferId = Number(req.params.id);
+    const imgId = Number(req.params.imageId);
+    const userId = req.session.user!.id;
+
+    const transfer = db
+      .prepare("SELECT from_id FROM transfer_history WHERE id = ?")
+      .get(transferId) as { from_id: number } | undefined;
+
+    if (!transfer) {
+      res.status(404).json({ error: "Transfer not found" });
+      return;
+    }
+
+    if (transfer.from_id !== userId) {
+      res.status(403).json({ error: "Only the sender can delete images" });
+      return;
+    }
+
+    const img = db
+      .prepare("SELECT id, filename FROM transfer_images WHERE id = ? AND transfer_id = ?")
+      .get(imgId, transferId) as { id: number; filename: string } | undefined;
+
+    if (!img) {
+      res.status(404).json({ error: "Image not found" });
+      return;
+    }
+
+    const filePath = join(uploadsDir, img.filename);
+    if (existsSync(filePath)) {
+      unlinkSync(filePath);
+    }
+    db.prepare("DELETE FROM transfer_images WHERE id = ?").run(imgId);
+
+    res.json({ deleted: true });
+  } catch (err) {
+    console.error("DELETE /transfers/:id/images/:imageId failed:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/uploads/:filename — serve image (authenticated)
+app.get("/uploads/:filename", requireAuth, (req, res) => {
+  try {
+    const filename = req.params.filename;
+
+    const img = db
+      .prepare("SELECT filename, mime_type FROM transfer_images WHERE filename = ?")
+      .get(filename) as { filename: string; mime_type: string } | undefined;
+
+    if (!img) {
+      res.status(404).json({ error: "Image not found" });
+      return;
+    }
+
+    const filePath = join(uploadsDir, img.filename);
+    if (!existsSync(filePath)) {
+      res.status(404).json({ error: "Image file not found" });
+      return;
+    }
+
+    res.type(img.mime_type).sendFile(filePath);
+  } catch (err) {
+    console.error("GET /uploads/:filename failed:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

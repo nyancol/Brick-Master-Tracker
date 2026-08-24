@@ -31,3 +31,18 @@ export interface Transfer {
   transferredByName: string;
   transferredAt: string;
 }
+
+export interface TransferStory {
+  description: string;
+  editedBy: number;
+  editedByName: string;
+  editedAt: string;
+}
+
+export interface TransferImage {
+  id: number;
+  filename: string;
+  originalName: string;
+  mimeType: string;
+  uploadedAt: string;
+}

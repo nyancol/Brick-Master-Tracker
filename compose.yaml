@@ -6,13 +6,13 @@ services:
       dockerfile: ./Dockerfile
     restart: unless-stopped
     ports:
-      - "5000:5000"
+      - "5173:5000"
     env_file:
       - .env
     networks:
       - caddy_public
     volumes:
-      - ${DB_PATH}:/app/data/brick.db
+      - ${DATA_PATH:-./brick-tracker-data}:/app/data
 
 networks:
   caddy_public:

@@ -1,8 +1,11 @@
 import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
-const dbPath = process.env.DB_PATH ?? "./brick.db";
+const dataPath = process.env.DATA_PATH ?? "./data";
+mkdirSync(resolve(dataPath), { recursive: true });
+
+const dbPath = process.env.DB_PATH ?? join(dataPath, "brick.db");
 mkdirSync(dirname(resolve(dbPath)), { recursive: true });
 
 const sqlite = new Database(dbPath);
@@ -159,5 +162,28 @@ if (columnExists("transfer_history", "from_holder")) {
   }
   console.log("Dropped legacy TEXT columns from transfer_history");
 }
+
+// Create story and image tables
+createTableIfNotExists(`
+  CREATE TABLE IF NOT EXISTS transfer_story (
+    transfer_id INTEGER PRIMARY KEY REFERENCES transfer_history(id),
+    description TEXT NOT NULL,
+    edited_by INTEGER REFERENCES users(id),
+    edited_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+`);
+
+createTableIfNotExists(`
+  CREATE TABLE IF NOT EXISTS transfer_images (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    transfer_id INTEGER REFERENCES transfer_history(id),
+    filename TEXT NOT NULL,
+    original_name TEXT NOT NULL,
+    mime_type TEXT NOT NULL,
+    uploaded_by INTEGER REFERENCES users(id),
+    uploaded_at INTEGER NOT NULL
+  );
+`);
 
 export default sqlite;

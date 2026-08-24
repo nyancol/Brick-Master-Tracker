@@ -43,7 +43,7 @@ VOLUME /app/data
 
 ENV NODE_ENV=production
 ENV PORT=5000
-ENV DB_PATH=/app/data/brick.db
+ENV DATA_PATH=/app/data
 
 USER appuser
 EXPOSE 5000

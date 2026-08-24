@@ -21,7 +21,7 @@ function getLang(): Lang {
 
 let currentLang: Lang = getLang();
 
-export type TKey = keyof typeof en | "honor.name" | "honor.heldBy" | "honor.transferTo" | "shame.name" | "shame.cursedUpon" | "shame.offloadTo" | "ledger.title" | "ledger.empty" | "notFound.title" | "notFound.description" | "logout";
+export type TKey = keyof typeof en | "honor.name" | "honor.heldBy" | "honor.transferTo" | "honor.waitingForTransfer" | "shame.name" | "shame.cursedUpon" | "shame.offloadTo" | "shame.waitingForTransfer" | "chronicles.title" | "chronicles.empty" | "chronicles.chapter" | "chronicles.editedBy" | "chronicles.on" | "chronicles.yearGroup" | "modal.cancel" | "modal.confirm" | "modal.descriptionLabel" | "modal.descriptionRequired" | "modal.uploadPhoto" | "modal.uploading" | "edit.save" | "edit.edit" | "edit.deletePhoto" | "edit.confirmDeletePhoto" | "notFound.title" | "notFound.description" | "logout";
 
 export function t(key: string): string {
   return getNested(locales[currentLang] as unknown as Record<string, unknown>, key);

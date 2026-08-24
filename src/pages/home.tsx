@@ -1,10 +1,11 @@
-import { format } from "date-fns";
-import { History, ArrowRight, Loader2, LogOut, User } from "lucide-react";
+import { Loader2, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useBricks, useTransfers, transferBrick, type AuthUser, type UserEntry } from "@/api";
+import { useBricks, transferBrick, type AuthUser, type UserEntry } from "@/api";
 import { useToast } from "@/hooks/use-toast";
 import { t, getLanguage, changeLanguage } from "@/hooks/use-translation";
 import { useState, useCallback } from "react";
+import TransferModal from "@/components/TransferModal";
+import ChroniclesView from "@/components/ChroniclesView";
 
 const LANGS = [
   { code: "en", label: "EN" },
@@ -20,16 +21,23 @@ export default function Home({ user, users }: Props) {
   const [, forceRender] = useState(0);
   const { toast } = useToast();
   const { data: bricks, loading: bricksLoading, refetch: refetchBricks } = useBricks();
-  const { data: transfers, loading: transfersLoading, refetch: refetchTransfers } = useTransfers();
   const [pending, setPending] = useState(false);
+  const [modal, setModal] = useState<{
+    color: "red" | "blue";
+    recipientId: number;
+    recipientName: string;
+  } | null>(null);
+  const [chroniclesKey, setChroniclesKey] = useState(0);
 
-  const handleTransfer = useCallback(
-    async (color: "red" | "blue", to: number) => {
+  const handleTransferConfirm = useCallback(
+    async (description: string, imageIds: number[]) => {
+      if (!modal) return;
       setPending(true);
       try {
-        await transferBrick(color, to);
+        await transferBrick(modal.color, modal.recipientId, description, imageIds);
+        setModal(null);
         refetchBricks();
-        refetchTransfers();
+        setChroniclesKey((k) => k + 1);
       } catch (err) {
         toast({
           title: t("transferFailed"),
@@ -40,7 +48,7 @@ export default function Home({ user, users }: Props) {
         setPending(false);
       }
     },
-    [refetchBricks, refetchTransfers, toast],
+    [modal, refetchBricks, toast],
   );
 
   const handleLangChange = useCallback((lang: string) => {
@@ -54,7 +62,7 @@ export default function Home({ user, users }: Props) {
   const isRedHolder = redBrick?.holderId === user.id;
   const isBlueHolder = blueBrick?.holderId === user.id;
 
-  if (bricksLoading || transfersLoading) {
+  if (bricksLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center space-y-4">
         <Loader2 className="w-12 h-12 animate-spin text-primary" />
@@ -151,7 +159,13 @@ export default function Home({ user, users }: Props) {
                           key={friend.id}
                           variant="outline"
                           className="flex-1 border-red-500/30 hover:bg-red-500 hover:text-white transition-colors"
-                          onClick={() => handleTransfer("red", friend.id)}
+                          onClick={() =>
+                            setModal({
+                              color: "red",
+                              recipientId: friend.id,
+                              recipientName: friend.displayName,
+                            })
+                          }
                           disabled={pending}
                         >
                           {friend.displayName}
@@ -161,7 +175,7 @@ export default function Home({ user, users }: Props) {
                 </>
               ) : (
                 <p className="text-sm font-mono text-red-500/50 uppercase tracking-widest">
-                  Waiting for {redBrick?.holderName || "someone"} to transfer…
+                  {t("honor.waitingForTransfer").replace("{name}", redBrick?.holderName || "someone")}
                 </p>
               )}
             </div>
@@ -205,7 +219,13 @@ export default function Home({ user, users }: Props) {
                           key={friend.id}
                           variant="outline"
                           className="flex-1 border-cyan-500/30 hover:bg-cyan-500 hover:text-white transition-colors"
-                          onClick={() => handleTransfer("blue", friend.id)}
+                          onClick={() =>
+                            setModal({
+                              color: "blue",
+                              recipientId: friend.id,
+                              recipientName: friend.displayName,
+                            })
+                          }
                           disabled={pending}
                         >
                           {friend.displayName}
@@ -215,7 +235,7 @@ export default function Home({ user, users }: Props) {
                 </>
               ) : (
                 <p className="text-sm font-mono text-cyan-500/50 uppercase tracking-widest">
-                  Waiting for {blueBrick?.holderName || "someone"} to transfer…
+                  {t("shame.waitingForTransfer").replace("{name}", blueBrick?.holderName || "someone")}
                 </p>
               )}
             </div>
@@ -234,58 +254,18 @@ export default function Home({ user, users }: Props) {
         </a>
       </div>
 
-      {/* Transfer History */}
-      <div className="mt-16 pt-8 border-t border-border">
-        <div className="flex items-center gap-3 mb-8">
-          <History className="w-6 h-6 text-muted-foreground" />
-          <h3 className="text-xl font-bold uppercase tracking-wider">
-            {t("ledger.title")}
-          </h3>
-        </div>
-        {!transfers || transfers.length === 0 ? (
-          <div className="text-center py-12 bg-muted/30 rounded-2xl border border-dashed border-muted">
-            <p className="font-mono text-muted-foreground">
-              {t("ledger.empty")}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {transfers.map((transfer) => (
-              <div
-                key={transfer.id}
-                className="flex items-center justify-between p-4 rounded-xl bg-card border border-border hover:border-primary/50 transition-colors"
-              >
-                <div className="flex items-center gap-4">
-                  <div
-                    className={`w-3 h-3 rounded-full ${
-                      transfer.color === "red"
-                        ? "bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.8)]"
-                        : "bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.8)]"
-                    }`}
-                  />
-                  <div className="flex items-center gap-3 font-mono text-sm md:text-base">
-                    <span className="text-muted-foreground">
-                      {transfer.fromName}
-                    </span>
-                    <ArrowRight className="w-4 h-4 text-muted-foreground/50" />
-                    <span className="font-bold text-foreground">
-                      {transfer.toName}
-                    </span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs font-mono text-muted-foreground">
-                    {format(
-                      new Date(transfer.transferredAt),
-                      "MMM d, HH:mm",
-                    )}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Transfer Modal */}
+      {modal && (
+        <TransferModal
+          color={modal.color}
+          recipientName={modal.recipientName}
+          onConfirm={handleTransferConfirm}
+          onCancel={() => setModal(null)}
+        />
+      )}
+
+      {/* Chronicles */}
+      <ChroniclesView key={chroniclesKey} currentUser={user} />
     </div>
   );
 }

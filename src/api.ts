@@ -31,6 +31,29 @@ export interface Transfer {
   transferredAt: string;
 }
 
+export interface TransferStory {
+  description: string | null;
+  editedBy: number | null;
+  editedByName: string | null;
+  editedAt: string | null;
+  images: TransferImage[];
+}
+
+export interface TransferImage {
+  id: number;
+  filename: string;
+  originalName: string;
+  mimeType: string;
+  uploadedAt: string;
+}
+
+export interface StagingImage {
+  id: number;
+  filename: string;
+  originalName: string;
+  mimeType: string;
+}
+
 export interface AuthUser {
   id: number;
   email: string;
@@ -93,13 +116,73 @@ export function useCurrentUser() {
   return useData<AuthMeResponse>("/api/auth/me");
 }
 
+export interface TransferResult {
+  transferId: number;
+  color: string;
+  holderId: number;
+  holderName: string;
+  holderAvatarUrl: string | null;
+  updatedAt: string;
+}
+
 export async function transferBrick(
   color: BrickColor,
   to: number,
-): Promise<BrickState> {
-  return fetchJson<BrickState>(`/api/bricks/${color}/transfer`, {
+  description: string,
+  imageIds: number[],
+): Promise<TransferResult> {
+  return fetchJson<TransferResult>(`/api/bricks/${color}/transfer`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ to }),
+    body: JSON.stringify({ to, description, imageIds }),
+  });
+}
+
+export async function fetchTransferStory(id: number): Promise<TransferStory> {
+  return fetchJson<TransferStory>(`/api/transfers/${id}/story`);
+}
+
+export async function editStory(
+  id: number,
+  description: string,
+): Promise<{ description: string; editedBy: number; editedByName: string; editedAt: string }> {
+  return fetchJson(`/api/transfers/${id}/story`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ description }),
+  });
+}
+
+export async function uploadStagingImage(file: File): Promise<StagingImage> {
+  const form = new FormData();
+  form.append("file", file);
+  return fetchJson<StagingImage>("/api/uploads/staging", {
+    method: "POST",
+    body: form,
+  });
+}
+
+export async function deleteStagingImage(id: number): Promise<void> {
+  await fetchJson(`/api/uploads/staging/${id}`, { method: "DELETE" });
+}
+
+export async function uploadTransferImage(
+  transferId: number,
+  file: File,
+): Promise<TransferImage> {
+  const form = new FormData();
+  form.append("file", file);
+  return fetchJson<TransferImage>(`/api/transfers/${transferId}/images`, {
+    method: "POST",
+    body: form,
+  });
+}
+
+export async function deleteTransferImage(
+  transferId: number,
+  imageId: number,
+): Promise<void> {
+  await fetchJson(`/api/transfers/${transferId}/images/${imageId}`, {
+    method: "DELETE",
   });
 }
