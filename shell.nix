@@ -6,6 +6,7 @@ in
 pkgs.mkShellNoCC {
   packages = with pkgs; [
     nodejs_22
+    neovim
     openspec
     pnpm
     git
