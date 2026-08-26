@@ -263,7 +263,7 @@ Run through this checklist every time you open a PR or push a commit:
 The database is created automatically on first request. No migration or seed commands needed:
 
 - `server/db.ts` runs on every startup — it creates tables if missing and seeds defaults if the database is empty.
-- The DB file defaults to `./brick.db`. Override with `DB_PATH`:
+- The DB file defaults to `/app/data/brick.db`. Override with `DB_PATH`:
   ```bash
   DB_PATH=./data/brick.db pnpm dev
   ```

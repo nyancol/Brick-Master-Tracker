@@ -5,7 +5,7 @@ import { dirname, join, resolve } from "node:path";
 const dataPath = process.env.DATA_PATH ?? "./data";
 mkdirSync(resolve(dataPath), { recursive: true });
 
-const dbPath = process.env.DB_PATH ?? join(dataPath, "brick.db");
+const dbPath = process.env.DB_PATH ?? "/app/data/brick.db";
 mkdirSync(dirname(resolve(dbPath)), { recursive: true });
 
 const sqlite = new Database(dbPath);
