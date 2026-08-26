@@ -5,6 +5,8 @@ import { v4 as uuidv4 } from "uuid";
 import { mkdirSync, unlinkSync, existsSync } from "node:fs";
 import { join, resolve, extname } from "node:path";
 import createSqliteStore from "better-sqlite3-session-store";
+import swaggerJsdoc from "swagger-jsdoc";
+import swaggerUi from "swagger-ui-express";
 import db from "./db.js";
 import {
   initOidc,
@@ -15,6 +17,12 @@ import {
   getAuthMe,
   getOidcConfig,
   getDiscoveryError,
+  isDevLoginEnabled,
+  seedDevUsers,
+  bootstrapDevBricks,
+  getDevTestUsers,
+  findDevTestUser,
+  upsertUser,
 } from "./auth.js";
 
 const SqliteStore = createSqliteStore(session);
@@ -56,9 +64,118 @@ const upload = multer({
   },
 });
 
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     User:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *         sub:
+ *           type: string
+ *         email:
+ *           type: string
+ *           format: email
+ *         displayName:
+ *           type: string
+ *         username:
+ *           type: string
+ *         avatarUrl:
+ *           type: string
+ *           nullable: true
+ *         createdAt:
+ *           type: integer
+ *           description: Unix timestamp ms
+ *     BrickState:
+ *       type: object
+ *       properties:
+ *         color:
+ *           type: string
+ *           enum: [red, blue]
+ *         holderId:
+ *           type: integer
+ *           nullable: true
+ *         holderName:
+ *           type: string
+ *         holderAvatarUrl:
+ *           type: string
+ *           nullable: true
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *     Transfer:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *         color:
+ *           type: string
+ *           enum: [red, blue]
+ *         fromId:
+ *           type: integer
+ *         fromName:
+ *           type: string
+ *         toId:
+ *           type: integer
+ *         toName:
+ *           type: string
+ *         transferredById:
+ *           type: integer
+ *         transferredByName:
+ *           type: string
+ *         transferredAt:
+ *           type: string
+ *           format: date-time
+ *     TransferStory:
+ *       type: object
+ *       properties:
+ *         description:
+ *           type: string
+ *         editedBy:
+ *           type: integer
+ *           nullable: true
+ *         editedByName:
+ *           type: string
+ *           nullable: true
+ *         editedAt:
+ *           type: string
+ *           format: date-time
+ *           nullable: true
+ *         images:
+ *           type: array
+ *           items:
+ *             $ref: "#/components/schemas/TransferImage"
+ *     TransferImage:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *         filename:
+ *           type: string
+ *         originalName:
+ *           type: string
+ *         mimeType:
+ *           type: string
+ *         uploadedAt:
+ *           type: string
+ *           format: date-time
+ *     Error:
+ *       type: object
+ *       properties:
+ *         error:
+ *           type: string
+ */
+
 const app = express();
 
 await initOidc();
+
+if (isDevLoginEnabled()) {
+  seedDevUsers();
+  bootstrapDevBricks();
+}
 
 app.use(express.json());
 app.use(
@@ -79,6 +196,48 @@ app.use(
 app.use((req, _res, next) => {
   console.log(`${req.method} ${req.url?.split("?")[0]}`);
   next();
+});
+
+// Generate OpenAPI spec from JSDoc annotations
+const swaggerSpec = swaggerJsdoc({
+  definition: {
+    openapi: "3.0.3",
+    info: {
+      title: "Brick Master Tracker API",
+      version: "0.0.1",
+      description:
+        "API for tracking transfers of the Brick of Honor (red) and Brick of Shame (blue) " +
+        "between three friends. Each transfer includes a story and optional images.\n\n" +
+        "Authentication is session-based via OIDC (Pocket-ID). In development, test-user " +
+        "login is available at `/auth/dev/login`.",
+    },
+    servers: [{ url: "/api" }],
+    tags: [
+      { name: "Health", description: "Health check endpoints" },
+      { name: "Authentication", description: "Login, logout, and session management" },
+      { name: "Bricks", description: "Current brick state and holder info" },
+      { name: "Transfers", description: "Transfer history, stories, and brick transfer actions" },
+      { name: "Uploads", description: "Image upload and management for transfer stories" },
+    ],
+    components: {
+      securitySchemes: {
+        cookieAuth: {
+          type: "apiKey",
+          in: "cookie",
+          name: "connect.sid",
+        },
+      },
+    },
+  },
+  apis: [new URL("app.ts", import.meta.url).pathname],
+});
+
+// Mount Swagger UI
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// Serve raw OpenAPI spec
+app.get("/api-docs.json", (_req, res) => {
+  res.json(swaggerSpec);
 });
 
 const VALID_COLORS = new Set(["red", "blue"]);
@@ -102,11 +261,47 @@ function qs(param: unknown): string | undefined {
 }
 
 // GET /healthz
+/**
+ * @openapi
+ * /healthz:
+ *   get:
+ *     tags: [Health]
+ *     summary: Health check
+ *     operationId: healthz
+ *     responses:
+ *       200:
+ *         description: Server is healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: ok
+ */
 app.get("/healthz", (_req, res) => {
   res.json({ status: "ok" });
 });
 
 // GET /auth/login
+/**
+ * @openapi
+ * /auth/login:
+ *   get:
+ *     tags: [Authentication]
+ *     summary: Initiate OIDC login
+ *     operationId: authLogin
+ *     responses:
+ *       302:
+ *         description: Redirect to OIDC provider
+ *       503:
+ *         description: OIDC not configured
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ */
 app.get("/auth/login", (_req, res) => {
   const config = getOidcConfig();
   if (!config) {
@@ -124,6 +319,50 @@ app.get("/auth/login", (_req, res) => {
 });
 
 // GET /auth/callback
+/**
+ * @openapi
+ * /auth/callback:
+ *   get:
+ *     tags: [Authentication]
+ *     summary: OIDC callback handler
+ *     operationId: authCallback
+ *     parameters:
+ *       - in: query
+ *         name: code
+ *         schema:
+ *           type: string
+ *         description: Authorization code from OIDC provider
+ *       - in: query
+ *         name: state
+ *         schema:
+ *           type: string
+ *         description: State parameter for CSRF protection
+ *       - in: query
+ *         name: error
+ *         schema:
+ *           type: string
+ *         description: Error code from OIDC provider
+ *       - in: query
+ *         name: error_description
+ *         schema:
+ *           type: string
+ *         description: Human-readable error description
+ *     responses:
+ *       302:
+ *         description: Redirect to home on success
+ *       400:
+ *         description: Missing state parameter
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ *       401:
+ *         description: Authentication failed or invalid state
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ */
 app.get("/auth/callback", async (req, res) => {
   const state = qs(req.query.state);
   const oidcError = qs(req.query.error);
@@ -171,6 +410,17 @@ app.get("/auth/callback", async (req, res) => {
 });
 
 // GET /auth/logout
+/**
+ * @openapi
+ * /auth/logout:
+ *   get:
+ *     tags: [Authentication]
+ *     summary: Logout and destroy session
+ *     operationId: authLogout
+ *     responses:
+ *       302:
+ *         description: Redirect to home after logout
+ */
 app.get("/auth/logout", (req, res) => {
   req.session.destroy((err) => {
     if (err) {
@@ -181,6 +431,34 @@ app.get("/auth/logout", (req, res) => {
 });
 
 // GET /auth/me
+/**
+ * @openapi
+ * /auth/me:
+ *   get:
+ *     tags: [Authentication]
+ *     summary: Get current user and all users
+ *     operationId: authMe
+ *     responses:
+ *       200:
+ *         description: Current user and user list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   $ref: "#/components/schemas/User"
+ *                 users:
+ *                   type: array
+ *                   items:
+ *                     $ref: "#/components/schemas/User"
+ *       401:
+ *         description: Not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ */
 app.get("/auth/me", (req, res) => {
   if (!req.session.user) {
     res.status(401).json({ error: "Not authenticated" });
@@ -195,13 +473,137 @@ app.get("/auth/me", (req, res) => {
   }
 });
 
+// GET /auth/dev — report whether dev test-user login is available
+/**
+ * @openapi
+ * /auth/dev:
+ *   get:
+ *     tags: [Authentication]
+ *     summary: Check if dev test-user login is available
+ *     operationId: authDev
+ *     responses:
+ *       200:
+ *         description: Dev login configuration
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 enabled:
+ *                   type: boolean
+ *                 users:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       username:
+ *                         type: string
+ *                       displayName:
+ *                         type: string
+ */
+app.get("/auth/dev", (_req, res) => {
+  if (isDevLoginEnabled()) {
+    res.json({ enabled: true, users: getDevTestUsers() });
+    return;
+  }
+  res.json({ enabled: false, users: [] });
+});
+
+// POST /auth/dev/login — sign in as a dev test user (no OIDC)
+/**
+ * @openapi
+ * /auth/dev/login:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Sign in as a dev test user (development only)
+ *     operationId: authDevLogin
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [username]
+ *             properties:
+ *               username:
+ *                 type: string
+ *                 description: One of the available dev test users
+ *     responses:
+ *       200:
+ *         description: Logged in successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   $ref: "#/components/schemas/User"
+ *                 users:
+ *                   type: array
+ *                   items:
+ *                     $ref: "#/components/schemas/User"
+ *       404:
+ *         description: Dev login not available or unknown user
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ */
+app.post("/auth/dev/login", (req, res) => {
+  if (!isDevLoginEnabled()) {
+    res.status(404).json({ error: "Dev login not available" });
+    return;
+  }
+
+  const username = typeof req.body?.username === "string" ? req.body.username : "";
+  const devUser = findDevTestUser(username);
+  if (!devUser) {
+    res.status(404).json({ error: "Unknown dev test user" });
+    return;
+  }
+
+  const user = upsertUser(
+    devUser.sub,
+    devUser.email,
+    devUser.displayName,
+    devUser.username,
+    devUser.avatarUrl,
+  );
+  req.session.user = { id: user.id, email: user.email };
+  req.session.save((err) => {
+    if (err) {
+      console.error("Dev login session save failed:", err);
+      res.status(500).json({ error: "Failed to create session" });
+      return;
+    }
+    res.json(getAuthMe(user.id));
+  });
+});
+
 // GET /bricks
+/**
+ * @openapi
+ * /bricks:
+ *   get:
+ *     tags: [Bricks]
+ *     summary: Get current brick states
+ *     operationId: getBricks
+ *     responses:
+ *       200:
+ *         description: Array of brick states
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: "#/components/schemas/BrickState"
+ */
 app.get("/bricks", (_req, res) => {
   try {
     const rows = db
       .prepare(
         `SELECT b.color, b.holder_id, b.updated_at,
-                u.display_name as holder_name, u.avatar_url as holder_avatar_url
+                u.username as holder_name, u.avatar_url as holder_avatar_url
          FROM brick_state b
          LEFT JOIN users u ON b.holder_id = u.id`,
       )
@@ -228,14 +630,31 @@ app.get("/bricks", (_req, res) => {
 });
 
 // GET /transfers — basic metadata only
+/**
+ * @openapi
+ * /transfers:
+ *   get:
+ *     tags: [Transfers]
+ *     summary: Get transfer history
+ *     operationId: getTransfers
+ *     responses:
+ *       200:
+ *         description: Array of transfers ordered by date descending
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: "#/components/schemas/Transfer"
+ */
 app.get("/transfers", (_req, res) => {
   try {
     const rows = db
       .prepare(
         `SELECT t.id, t.color, t.from_id, t.to_id, t.transferred_by_id, t.transferred_at,
-                fu.display_name as from_name,
-                tu.display_name as to_name,
-                bu.display_name as transferred_by_name
+                fu.username as from_name,
+                tu.username as to_name,
+                bu.username as transferred_by_name
          FROM transfer_history t
          LEFT JOIN users fu ON t.from_id = fu.id
          LEFT JOIN users tu ON t.to_id = tu.id
@@ -273,12 +692,34 @@ app.get("/transfers", (_req, res) => {
 });
 
 // GET /transfers/:id/story — full story details
+/**
+ * @openapi
+ * /transfers/{id}/story:
+ *   get:
+ *     tags: [Transfers]
+ *     summary: Get transfer story with images
+ *     operationId: getTransferStory
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Transfer ID
+ *     responses:
+ *       200:
+ *         description: Transfer story with images
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/TransferStory"
+ */
 app.get("/transfers/:id/story", (req, res) => {
   try {
     const story = db
       .prepare(
         `SELECT ts.description, ts.edited_by, ts.edited_at,
-                eu.display_name as edited_by_name
+                eu.username as edited_by_name
          FROM transfer_story ts
          LEFT JOIN users eu ON ts.edited_by = eu.id
          WHERE ts.transfer_id = ?`,
@@ -327,6 +768,59 @@ app.get("/transfers/:id/story", (req, res) => {
 });
 
 // PUT /transfers/:id/story — upsert description (sender only, non-empty)
+/**
+ * @openapi
+ * /transfers/{id}/story:
+ *   put:
+ *     tags: [Transfers]
+ *     summary: Update transfer story description
+ *     operationId: updateTransferStory
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Transfer ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [description]
+ *             properties:
+ *               description:
+ *                 type: string
+ *                 description: Non-empty story text
+ *     responses:
+ *       200:
+ *         description: Updated story object
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/TransferStory"
+ *       400:
+ *         description: Invalid description
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ *       403:
+ *         description: Only the sender can edit
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ *       404:
+ *         description: Transfer not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ */
 app.put("/transfers/:id/story", requireAuth, (req, res) => {
   try {
     const transferId = Number(req.params.id);
@@ -368,13 +862,13 @@ app.put("/transfers/:id/story", requireAuth, (req, res) => {
     }
 
     const user = db
-      .prepare("SELECT display_name FROM users WHERE id = ?")
-      .get(userId) as { display_name: string };
+      .prepare("SELECT username FROM users WHERE id = ?")
+      .get(userId) as { username: string };
 
     res.json({
       description,
       editedBy: userId,
-      editedByName: user.display_name,
+      editedByName: user.username,
       editedAt: new Date(now).toISOString(),
     });
   } catch (err) {
@@ -384,6 +878,62 @@ app.put("/transfers/:id/story", requireAuth, (req, res) => {
 });
 
 // POST /bricks/:color/transfer
+/**
+ * @openapi
+ * /bricks/{color}/transfer:
+ *   post:
+ *     tags: [Transfers]
+ *     summary: Transfer a brick to a new holder
+ *     operationId: transferBrick
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: color
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [red, blue]
+ *         description: Brick color
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [to, description]
+ *             properties:
+ *               to:
+ *                 type: integer
+ *                 description: Recipient user ID
+ *               description:
+ *                 type: string
+ *                 description: Story description for this transfer
+ *               imageIds:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 description: IDs of staged images to associate
+ *     responses:
+ *       200:
+ *         description: Transfer successful, returns updated brick state
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/BrickState"
+ *       400:
+ *         description: Invalid color, recipient, or description
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ *       403:
+ *         description: Only the current holder can transfer
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ */
 app.post("/bricks/:color/transfer", requireAuth, (req, res) => {
   const color = req.params.color as string;
   const { to, description, imageIds } = req.body;
@@ -414,13 +964,13 @@ app.post("/bricks/:color/transfer", requireAuth, (req, res) => {
     const result = db.transaction((): TxResult => {
       const current = db
         .prepare(
-          `SELECT b.holder_id, u.display_name
+          `SELECT b.holder_id, u.username
            FROM brick_state b
            LEFT JOIN users u ON b.holder_id = u.id
            WHERE b.color = ?`,
         )
         .get(color) as
-        | { holder_id: number | null; display_name: string | null }
+        | { holder_id: number | null; username: string | null }
         | undefined;
 
       if (!current) {
@@ -439,9 +989,9 @@ app.post("/bricks/:color/transfer", requireAuth, (req, res) => {
       }
 
       const recipient = db
-        .prepare("SELECT id, display_name, avatar_url FROM users WHERE id = ?")
+        .prepare("SELECT id, username, avatar_url FROM users WHERE id = ?")
         .get(to) as
-        | { id: number; display_name: string; avatar_url: string | null }
+        | { id: number; username: string; avatar_url: string | null }
         | undefined;
 
       if (!recipient) {
@@ -473,7 +1023,7 @@ app.post("/bricks/:color/transfer", requireAuth, (req, res) => {
           transferId,
           color,
           holderId: to,
-          holderName: recipient.display_name,
+          holderName: recipient.username,
           holderAvatarUrl: recipient.avatar_url,
           updatedAt: new Date(now).toISOString(),
         },
@@ -493,6 +1043,41 @@ app.post("/bricks/:color/transfer", requireAuth, (req, res) => {
 });
 
 // POST /api/uploads/staging — upload image before transfer exists
+/**
+ * @openapi
+ * /uploads/staging:
+ *   post:
+ *     tags: [Uploads]
+ *     summary: Upload a staging image before transfer creation
+ *     operationId: uploadStagingImage
+ *     security:
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file]
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: Image file (JPEG, PNG, WebP, GIF, max 50 MB)
+ *     responses:
+ *       200:
+ *         description: Image uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/TransferImage"
+ *       400:
+ *         description: Invalid or missing file
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ */
 app.post("/uploads/staging", requireAuth, (req, res) => {
   upload.single("file")(req, res, (err) => {
     if (err) {
@@ -530,6 +1115,45 @@ app.post("/uploads/staging", requireAuth, (req, res) => {
 });
 
 // DELETE /api/uploads/staging/:id — remove staging image
+/**
+ * @openapi
+ * /uploads/staging/{id}:
+ *   delete:
+ *     tags: [Uploads]
+ *     summary: Delete a staging image
+ *     operationId: deleteStagingImage
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Image ID
+ *     responses:
+ *       200:
+ *         description: Image deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 deleted:
+ *                   type: boolean
+ *       403:
+ *         description: Only the uploader can delete
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ *       404:
+ *         description: Image not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ */
 app.delete("/uploads/staging/:id", requireAuth, (req, res) => {
   try {
     const imgId = Number(req.params.id);
@@ -568,6 +1192,54 @@ app.delete("/uploads/staging/:id", requireAuth, (req, res) => {
 });
 
 // POST /api/transfers/:id/images — upload image to existing transfer
+/**
+ * @openapi
+ * /transfers/{id}/images:
+ *   post:
+ *     tags: [Uploads]
+ *     summary: Upload an image to an existing transfer
+ *     operationId: uploadTransferImage
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Transfer ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file]
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: Image file (JPEG, PNG, WebP, GIF, max 50 MB)
+ *     responses:
+ *       200:
+ *         description: Image uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/TransferImage"
+ *       403:
+ *         description: Only the sender can upload
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ *       404:
+ *         description: Transfer not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ */
 app.post("/transfers/:id/images", requireAuth, (req, res) => {
   upload.single("file")(req, res, (err) => {
     if (err) {
@@ -622,6 +1294,51 @@ app.post("/transfers/:id/images", requireAuth, (req, res) => {
 });
 
 // DELETE /api/transfers/:id/images/:imageId
+/**
+ * @openapi
+ * /transfers/{id}/images/{imageId}:
+ *   delete:
+ *     tags: [Uploads]
+ *     summary: Delete an image from a transfer
+ *     operationId: deleteTransferImage
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Transfer ID
+ *       - in: path
+ *         name: imageId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Image ID
+ *     responses:
+ *       200:
+ *         description: Image deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 deleted:
+ *                   type: boolean
+ *       403:
+ *         description: Only the sender can delete
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ *       404:
+ *         description: Transfer or image not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ */
 app.delete("/transfers/:id/images/:imageId", requireAuth, (req, res) => {
   try {
     const transferId = Number(req.params.id);
@@ -665,6 +1382,37 @@ app.delete("/transfers/:id/images/:imageId", requireAuth, (req, res) => {
 });
 
 // GET /api/uploads/:filename — serve image (authenticated)
+/**
+ * @openapi
+ * /uploads/{filename}:
+ *   get:
+ *     tags: [Uploads]
+ *     summary: Serve an uploaded image file
+ *     operationId: getUploadedImage
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: filename
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Image filename
+ *     responses:
+ *       200:
+ *         description: Image file
+ *         content:
+ *           application/octet-stream:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       404:
+ *         description: Image not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ */
 app.get("/uploads/:filename", requireAuth, (req, res) => {
   try {
     const filename = req.params.filename;

@@ -3,6 +3,7 @@ export interface User {
   sub: string;
   email: string;
   displayName: string;
+  username: string;
   avatarUrl: string | null;
   createdAt: number;
 }

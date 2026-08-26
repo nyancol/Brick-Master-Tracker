@@ -58,18 +58,30 @@ export interface AuthUser {
   id: number;
   email: string;
   displayName: string;
+  username: string;
   avatarUrl: string | null;
 }
 
 export interface UserEntry {
   id: number;
   displayName: string;
+  username: string;
   avatarUrl: string | null;
 }
 
 interface AuthMeResponse {
   user: AuthUser;
   users: UserEntry[];
+}
+
+export interface DevUserEntry {
+  username: string;
+  displayName: string;
+}
+
+export interface DevLoginInfo {
+  enabled: boolean;
+  users: DevUserEntry[];
 }
 
 interface DataState<T> {
@@ -114,6 +126,18 @@ export function useTransfers() {
 
 export function useCurrentUser() {
   return useData<AuthMeResponse>("/api/auth/me");
+}
+
+export async function fetchDevLoginConfig(): Promise<DevLoginInfo> {
+  return fetchJson<DevLoginInfo>("/api/auth/dev");
+}
+
+export async function devLogin(username: string): Promise<void> {
+  await fetchJson("/api/auth/dev/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username }),
+  });
 }
 
 export interface TransferResult {

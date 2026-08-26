@@ -119,8 +119,15 @@ export async function handleCallback(
   const email = (claims.email as string) ?? `${sub}@unknown`;
   const name = (claims.name as string) ?? email.split("@")[0] ?? sub;
   const picture = (claims.picture as string) ?? null;
+  const preferredUsername = (claims.preferred_username as string) ?? null;
+  let username: string;
+  if (preferredUsername) {
+    username = preferredUsername;
+  } else {
+    username = name.toLowerCase().replace(/\s+/g, "-");
+  }
 
-  const user = upsertUser(sub, email, name, picture);
+  const user = upsertUser(sub, email, name, username, picture);
   maybeBootstrapBricks(user);
 
   return { id: user.id, email: user.email };
@@ -130,23 +137,25 @@ export function upsertUser(
   sub: string,
   email: string,
   displayName: string,
+  username: string,
   avatarUrl: string | null,
 ): User {
   const existing = db
-    .prepare("SELECT id, email, display_name, avatar_url FROM users WHERE sub = ?")
+    .prepare("SELECT id, email, display_name, username, avatar_url FROM users WHERE sub = ?")
     .get(sub) as
-    | { id: number; email: string; display_name: string; avatar_url: string | null }
+    | { id: number; email: string; display_name: string; username: string; avatar_url: string | null }
     | undefined;
 
   if (existing) {
     db.prepare(
-      "UPDATE users SET email = ?, display_name = ?, avatar_url = ? WHERE id = ?",
-    ).run(email, displayName, avatarUrl, existing.id);
+      "UPDATE users SET email = ?, display_name = ?, username = ?, avatar_url = ? WHERE id = ?",
+    ).run(email, displayName, username, avatarUrl, existing.id);
     return {
       id: existing.id,
       sub,
       email,
       displayName,
+      username,
       avatarUrl,
       createdAt: 0,
     };
@@ -155,15 +164,16 @@ export function upsertUser(
   const now = Date.now();
   const result = db
     .prepare(
-      "INSERT INTO users (sub, email, display_name, avatar_url, created_at) VALUES (?, ?, ?, ?, ?)",
+      "INSERT INTO users (sub, email, display_name, username, avatar_url, created_at) VALUES (?, ?, ?, ?, ?, ?)",
     )
-    .run(sub, email, displayName, avatarUrl, now);
+    .run(sub, email, displayName, username, avatarUrl, now);
 
   return {
     id: Number(result.lastInsertRowid),
     sub,
     email,
     displayName,
+    username,
     avatarUrl,
     createdAt: now,
   };
@@ -208,21 +218,82 @@ export function getSessionSecret(): string {
   return secret;
 }
 
+export interface DevTestUser {
+  sub: string;
+  email: string;
+  displayName: string;
+  username: string;
+  avatarUrl: string | null;
+}
+
+export const DEV_TEST_USERS: DevTestUser[] = [
+  { sub: "dev:yann", email: "yann@example.com", displayName: "Yann", username: "yann", avatarUrl: null },
+  { sub: "dev:anselme", email: "anselme@example.com", displayName: "Anselme", username: "anselme", avatarUrl: null },
+  { sub: "dev:thomas", email: "thomas@example.com", displayName: "Thomas", username: "thomas", avatarUrl: null },
+];
+
+export function isDevLoginEnabled(): boolean {
+  if (process.env.NODE_ENV === "production") return false;
+  return process.env.DEV_LOGIN !== "false";
+}
+
+export function seedDevUsers(): void {
+  for (const user of DEV_TEST_USERS) {
+    upsertUser(user.sub, user.email, user.displayName, user.username, user.avatarUrl);
+  }
+  console.log(`Seeded ${DEV_TEST_USERS.length} dev test users`);
+}
+
+export function bootstrapDevBricks(): void {
+  const count = db
+    .prepare("SELECT COUNT(*) as count FROM brick_state")
+    .get() as { count: number };
+
+  if (count.count > 0) return;
+
+  const owners: Array<{ color: "red" | "blue"; username: string }> = [
+    { color: "red", username: "yann" },
+    { color: "blue", username: "thomas" },
+  ];
+
+  for (const owner of owners) {
+    const devUser = DEV_TEST_USERS.find((u) => u.username === owner.username);
+    if (!devUser) continue;
+    const user = db
+      .prepare("SELECT id FROM users WHERE sub = ?")
+      .get(devUser.sub) as { id: number } | undefined;
+    if (!user) continue;
+    db.prepare(
+      "INSERT INTO brick_state (color, holder_id, updated_at) VALUES (?, ?, ?)",
+    ).run(owner.color, user.id, Date.now());
+    console.log(`Bootstrapped ${owner.color} brick → ${devUser.displayName}`);
+  }
+}
+
+export function getDevTestUsers(): Array<{ username: string; displayName: string }> {
+  return DEV_TEST_USERS.map((u) => ({ username: u.username, displayName: u.displayName }));
+}
+
+export function findDevTestUser(username: string): DevTestUser | undefined {
+  return DEV_TEST_USERS.find((u) => u.username === username);
+}
+
 export interface AuthMeResponse {
   user: {
     id: number;
     email: string;
     displayName: string;
+    username: string;
     avatarUrl: string | null;
   };
-  users: Array<{ id: number; displayName: string; avatarUrl: string | null }>;
+  users: Array<{ id: number; displayName: string; username: string; avatarUrl: string | null }>;
 }
 
 export function getAuthMe(userId: number): AuthMeResponse {
   const currentUser = db
-    .prepare("SELECT id, email, display_name, avatar_url FROM users WHERE id = ?")
+    .prepare("SELECT id, email, display_name, username, avatar_url FROM users WHERE id = ?")
     .get(userId) as
-    | { id: number; email: string; display_name: string; avatar_url: string | null }
+    | { id: number; email: string; display_name: string; username: string; avatar_url: string | null }
     | undefined;
 
   if (!currentUser) {
@@ -230,10 +301,11 @@ export function getAuthMe(userId: number): AuthMeResponse {
   }
 
   const allUsers = db
-    .prepare("SELECT id, display_name, avatar_url FROM users ORDER BY display_name")
+    .prepare("SELECT id, display_name, username, avatar_url FROM users ORDER BY display_name")
     .all() as Array<{
     id: number;
     display_name: string;
+    username: string;
     avatar_url: string | null;
   }>;
 
@@ -242,11 +314,13 @@ export function getAuthMe(userId: number): AuthMeResponse {
       id: currentUser.id,
       email: currentUser.email,
       displayName: currentUser.display_name,
+      username: currentUser.username,
       avatarUrl: currentUser.avatar_url,
     },
     users: allUsers.map((u) => ({
       id: u.id,
       displayName: u.display_name,
+      username: u.username,
       avatarUrl: u.avatar_url,
     })),
   };

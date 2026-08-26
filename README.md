@@ -19,7 +19,7 @@ flowchart TB
     end
 
     subgraph Server["Express Server (single process)"]
-        routes["/api/* routes (3 total)"]
+        routes["/api/* routes (17 total)"]
         sqlite[("better-sqlite3 (WAL mode)")]
     end
 
@@ -27,7 +27,7 @@ flowchart TB
         dbFile[("brick.db")]
     end
 
-    Client -->|"GET /api/bricks\nGET /api/transfers\nPOST /api/bricks/:color/transfer"| Server
+    Client -->|"See /api/api-docs for full API reference"| Server
     Client -->|"SPA fallback — GET /*"| Server
     Server --> sqlite --> FileSystem
 ```
@@ -142,41 +142,27 @@ Two rows are seeded automatically if the database is empty:
 
 ---
 
-## API Routes
+## API Documentation
 
-| Method | Path | Body | Response | Notes |
-|--------|------|------|----------|-------|
-| `GET` | `/api/healthz` | — | `{ status: "ok" }` | Health check |
-| `GET` | `/api/bricks` | — | `BrickState[]` | Current holder for each color |
-| `GET` | `/api/transfers` | — | `Transfer[]` | Descending by `transferredAt` |
-| `POST` | `/api/bricks/:color/transfer` | `{ to: "Yann" \| "Anselme" \| "Thomas" }` | `BrickState` | Atomic SQLite transaction |
+All API endpoints are documented via an OpenAPI 3.0 specification, served interactively through Swagger UI.
 
-### Transfer flow
+### Development
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Express
-    participant SQLite
-
-    Client->>Express: POST /api/bricks/red/transfer { to: "Anselme" }
-    Express->>Express: Manual validation (color, recipient)
-    alt invalid
-        Express-->>Client: 400 Bad Request
-    else valid
-        Express->>SQLite: BEGIN TRANSACTION
-        Express->>SQLite: SELECT holder FROM brick_state WHERE color = 'red'
-        SQLite-->>Express: { holder: "Yann" }
-        alt holder === to
-            Express-->>Client: 400 "Cannot transfer to current holder"
-        else different holder
-            Express->>SQLite: UPDATE brick_state SET holder = 'Anselme'
-            Express->>SQLite: INSERT INTO transfer_history (...)
-            Express->>SQLite: COMMIT
-            Express-->>Client: 200 JSON
-        end
-    end
+```bash
+pnpm dev
+# Open http://localhost:5173/api/api-docs
 ```
+
+### Production
+
+```bash
+pnpm build && pnpm start
+# Open http://localhost:5000/api/api-docs
+```
+
+### Raw spec
+
+The raw OpenAPI specification is available as JSON at `/api/api-docs.json`.
 
 ---
 
@@ -230,6 +216,22 @@ pnpm build
 
 # Run production server on :5000
 PORT=5000 pnpm start
+```
+
+### Testing with dev test users (no OIDC provider)
+
+During development you can sign in without the OIDC provider. When dev login is enabled (the default outside production), the login page shows a **"Dev test users"** picker with three seeded accounts — **Yann**, **Anselme**, and **Thomas** — in addition to the normal "Sign in" button.
+
+- Each picker button signs you in as that user via a real session, so you can test the full multi-user transfer flow (holders, recipient pickers, transfer authorization) by signing in as different users.
+- On a freshly initialized database, the red brick is bootstrapped to **Yann** and the blue brick to **Thomas**, so transfers are testable immediately.
+- Dev login is disabled automatically when `NODE_ENV=production`. To disable it explicitly in development, set `DEV_LOGIN=false` in your environment.
+
+```bash
+# Start the dev server, then open http://localhost:5173 and use the test-user picker
+pnpm dev
+
+# Or disable dev test-user login
+DEV_LOGIN=false pnpm dev
 ```
 
 ### Before submitting a change

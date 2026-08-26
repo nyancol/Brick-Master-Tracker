@@ -19,6 +19,7 @@ sqlite.exec(`
     sub TEXT UNIQUE NOT NULL,
     email TEXT NOT NULL,
     display_name TEXT NOT NULL,
+    username TEXT NOT NULL DEFAULT '',
     avatar_url TEXT,
     created_at INTEGER NOT NULL
   );
@@ -29,6 +30,12 @@ sqlite.exec(`
     expire TEXT NOT NULL
   );
 `);
+
+// Add username column if it doesn't exist (migration for existing databases)
+if (!columnExists("users", "username")) {
+  sqlite.exec("ALTER TABLE users ADD COLUMN username TEXT NOT NULL DEFAULT ''");
+  console.log("Added username column to users table");
+}
 
 // Check if old TEXT column schema exists and migrate
 function columnExists(table: string, column: string): boolean {

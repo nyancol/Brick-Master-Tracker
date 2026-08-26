@@ -173,12 +173,12 @@ export default function Home({ user, users }: Props) {
                             setModal({
                               color: "red",
                               recipientId: friend.id,
-                              recipientName: friend.displayName,
+                              recipientName: friend.username,
                             })
                           }
                           disabled={pending}
                         >
-                          {friend.displayName}
+                          {friend.username}
                         </Button>
                       ))}
                   </div>
@@ -236,12 +236,12 @@ export default function Home({ user, users }: Props) {
                             setModal({
                               color: "blue",
                               recipientId: friend.id,
-                              recipientName: friend.displayName,
+                              recipientName: friend.username,
                             })
                           }
                           disabled={pending}
                         >
-                          {friend.displayName}
+                          {friend.username}
                         </Button>
                       ))}
                   </div>
