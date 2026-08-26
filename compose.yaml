@@ -7,6 +7,9 @@ services:
     restart: unless-stopped
     ports:
       - "5000:5000"
+    environment:
+      DB_PATH: /app/data/brick.db
+      IMAGE_PATH: /app/data/upload
     env_file:
       - .env
     networks:
