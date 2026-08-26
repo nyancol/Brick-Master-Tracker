@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
-const dataPath = process.env.DATA_PATH ?? "./data";
+const dataPath = process.env.DATA_PATH ?? "/app/data";
 mkdirSync(resolve(dataPath), { recursive: true });
 
 const dbPath = process.env.DB_PATH ?? "/app/data/brick.db";

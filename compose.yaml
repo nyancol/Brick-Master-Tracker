@@ -12,7 +12,7 @@ services:
     networks:
       - caddy_public
     volumes:
-      - ${DATA_PATH:-./brick-tracker-data}:/app/data
+      - ./brick-tracker-data:/app/data
 
 networks:
   caddy_public:

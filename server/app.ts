@@ -27,8 +27,7 @@ import {
 
 const SqliteStore = createSqliteStore(session);
 
-const dataPath = process.env.DATA_PATH ?? "./data";
-const uploadsDir = resolve(dataPath, "uploads");
+const uploadsDir = resolve(process.env.IMAGE_PATH ?? "/app/data/upload");
 mkdirSync(uploadsDir, { recursive: true });
 
 const VALID_MIME = new Set([
