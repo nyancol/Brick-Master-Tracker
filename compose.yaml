@@ -13,8 +13,6 @@ services:
       - caddy_public
     volumes:
       - ${DATA_PATH:-./brick-tracker-data}:/app/data
-      - ${DB_PATH:-./brick-tracker-data/brick.db}:/app/data/brick.db
-
 
 networks:
   caddy_public:
