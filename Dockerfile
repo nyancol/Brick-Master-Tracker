@@ -23,8 +23,6 @@ FROM node:24-alpine AS production
 RUN corepack enable
 RUN apk add --no-cache build-base python3 && ln -sf python3 /usr/bin/python && npm install -g node-gyp
 
-RUN addgroup -g 1001 -S appgroup && adduser -u 1001 -S appuser -G appgroup
-
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml .npmrc ./
@@ -38,13 +36,13 @@ RUN pnpm install --frozen-lockfile --prod --ignore-scripts && \
 # Copy built artifacts from build stage
 COPY --from=build /app/dist ./dist
 
-RUN mkdir -p /app/data && chown -R appuser:appgroup /app
+RUN mkdir -p /app/data
 VOLUME /app/data
 
 ENV NODE_ENV=production
 ENV PORT=5000
 
-USER appuser
+USER node
 EXPOSE 5000
 
 CMD ["node", "dist/server.mjs"]
