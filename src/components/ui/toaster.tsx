@@ -12,10 +12,10 @@ export function Toaster() {
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className={`group pointer-events-auto relative flex w-full items-center justify-between gap-4 rounded-sm border-2 p-4 pr-8 shadow-lg animate-unfurl ${
+          className={`group pointer-events-auto relative flex w-full items-center justify-between gap-4 bevel border-2 p-4 pr-8 shadow-lg animate-unfurl ${
             toast.variant === "destructive"
               ? "border-destructive bg-destructive text-destructive-foreground"
-              : "border-gold bg-card text-card-foreground"
+              : "bg-card text-card-foreground"
           }`}
         >
           <div className="grid gap-1">

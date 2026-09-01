@@ -12,12 +12,13 @@ export default function ThemeToggle() {
     <div className="flex gap-1" role="radiogroup" aria-label="Theme">
       <button
         onClick={() => setTheme(isActiveLight && !isSystem ? "system" : "light")}
-        className={`font-mono text-xs px-3 py-1 rounded-sm border transition-colors ${
+        className={`font-mono text-xs px-3 py-1 bevel transition-colors ${
           isActiveLight
-            ? "bg-primary text-primary-foreground border-primary"
-            : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+            ? "bg-primary text-primary-foreground"
+            : "bg-card text-card-foreground hover:bg-muted"
         }`}
-        aria-label="Light mode"
+        aria-label="Day mode (stone walls)"
+        title="Day — stone walls"
         role="radio"
         aria-checked={isActiveLight}
       >
@@ -25,12 +26,13 @@ export default function ThemeToggle() {
       </button>
       <button
         onClick={() => setTheme(isActiveDark && !isSystem ? "system" : "dark")}
-        className={`font-mono text-xs px-3 py-1 rounded-sm border transition-colors ${
+        className={`font-mono text-xs px-3 py-1 bevel transition-colors ${
           isActiveDark
-            ? "bg-primary text-primary-foreground border-primary"
-            : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+            ? "bg-primary text-primary-foreground"
+            : "bg-card text-card-foreground hover:bg-muted"
         }`}
-        aria-label="Dark mode"
+        aria-label="Dungeon mode (starfield)"
+        title="Dungeon — starfield"
         role="radio"
         aria-checked={isActiveDark}
       >

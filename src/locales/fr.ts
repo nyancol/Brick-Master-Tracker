@@ -4,7 +4,7 @@ const fr = {
   honor: {
     name: "Brique de l'Honneur",
     heldBy: "Actuellement détenue par",
-    transferTo: "Passer à",
+    transferTo: "Décerner à",
     waitingForTransfer: "En attente que {name} transfère…",
   },
   shame: {
@@ -14,7 +14,7 @@ const fr = {
     waitingForTransfer: "En attente que {name} transfère…",
   },
   chronicles: {
-    title: "Épopées des Briques",
+    title: "La Grande Chronique",
     empty: "Aucune entrée enregistrée.",
     chapter: "Chapitre",
     editedBy: "Modifié par",
@@ -23,8 +23,8 @@ const fr = {
   },
   modal: {
     cancel: "Annuler",
-    confirm: "Confirmer le transfert",
-    descriptionLabel: "Pourquoi ? Raconte l'histoire...",
+    confirm: "Sceller à jamais",
+    descriptionLabel: "Inscris ton exploit dans la chronique...",
     descriptionRequired: "Une description est requise.",
     uploadPhoto: "Ajouter des photos",
     uploading: "Envoi en cours...",
@@ -35,12 +35,33 @@ const fr = {
     deletePhoto: "Supprimer la photo",
     confirmDeletePhoto: "Es-tu sûr de vouloir supprimer cette photo ?",
   },
-  loading: "Chargement du Système...",
+  loading: "Invocation des briques...",
   transferFailed: "Échec du transfert",
-  logout: "Déconnexion",
+  logout: "Fuir le donjon",
+  marquee: {
+    template: "Oyez ! Oyez ! {brick} est passée de {from} à {to} !",
+    empty: "Oyez ! Oyez ! Venez contempler les Briques de l'Honneur et de la Honte !",
+  },
+  footer: {
+    counterLabel: "Tu es le visiteur numéro",
+    webringTitle: "⚜ L'Anneau Web des Briques ⚜",
+    prev: "‹ préc.",
+    random: "au hasard",
+    next: "suivant ›",
+    bestViewed:
+      "Optimisé pour Netscape Navigator 4.0 en 800×600 — sous peine de voir ton ordinateur saisi par la Couronne.",
+    construction: "En construction par les Maçons du Roi",
+  },
+  lute: {
+    play: "Jouer du luth",
+    stop: "Faire taire le luth",
+  },
+  login: {
+    signIn: "Entrer dans le donjon",
+  },
   notFound: {
-    title: "404 Page introuvable",
-    description: "La page que vous cherchez n'existe pas.",
+    title: "Halte ! Qui va là ?",
+    description: "Nulle page n'existe en ces terres.",
   },
 } as const;
 

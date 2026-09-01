@@ -1,13 +1,18 @@
-import { Loader2, DoorOpen, Shield } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Ornament } from "@/components/ui/ornament";
-import { useBricks, transferBrick, type AuthUser, type UserEntry } from "@/api";
+import { useBricks, transferBrick, useTransfers, type AuthUser, type UserEntry } from "@/api";
 import { useToast } from "@/hooks/use-toast";
 import { t, getLanguage, changeLanguage } from "@/hooks/use-translation";
 import { useState, useCallback } from "react";
 import TransferModal from "@/components/TransferModal";
 import ChroniclesView from "@/components/ChroniclesView";
 import ThemeToggle from "@/components/ThemeToggle";
+import LuteToggle from "@/components/kitsch/LuteToggle";
+import HearYeMarquee from "@/components/kitsch/HearYeMarquee";
+import VisitorCounter from "@/components/kitsch/VisitorCounter";
+import WebringFooter from "@/components/kitsch/WebringFooter";
+import Badges88 from "@/components/kitsch/Badges88";
+import ConstructionBadge from "@/components/kitsch/ConstructionBadge";
 
 const LANGS = [
   { code: "en", label: "EN" },
@@ -23,6 +28,7 @@ export default function Home({ user, users }: Props) {
   const [, forceRender] = useState(0);
   const { toast } = useToast();
   const { data: bricks, loading: bricksLoading, refetch: refetchBricks } = useBricks();
+  const { data: transfers } = useTransfers();
   const [pending, setPending] = useState(false);
   const [modal, setModal] = useState<{
     color: "red" | "blue";
@@ -68,7 +74,7 @@ export default function Home({ user, users }: Props) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center space-y-4">
         <Loader2 className="w-12 h-12 animate-spin text-gold" />
-        <p className="font-mono text-muted-foreground uppercase tracking-widest text-sm">
+        <p className="font-mono text-card-foreground bg-card bevel px-4 py-2 uppercase tracking-widest text-sm">
           {t("loading")}
         </p>
       </div>
@@ -78,29 +84,20 @@ export default function Home({ user, users }: Props) {
   const title = t("title");
 
   return (
-    <div className="min-h-screen w-full p-4 md:p-8 max-w-5xl mx-auto space-y-12">
-      <svg width="0" height="0" className="absolute">
-        <defs>
-          <clipPath id="heater-shield" clipPathUnits="objectBoundingBox">
-            <path d="M0,0.08 Q0,0 0.08,0 L0.92,0 Q1,0 1,0.08 L1,0.75 Q1,0.95 0.5,1 Q0,0.95 0,0.75 Z" />
-          </clipPath>
-        </defs>
-      </svg>
-
-      <header className="text-center space-y-4 mb-12">
+    <div className="min-h-screen w-full p-4 md:p-8 max-w-5xl mx-auto">
+      <header className="text-center space-y-4 mb-10">
         <div className="flex justify-end items-center gap-4 mb-2">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground font-mono">
-            <Shield className="w-4 h-4" />
+          <div className="flex items-center gap-2 text-sm text-card-foreground bg-card bevel px-3 py-1 font-mono">
             {user.displayName}
           </div>
           <a
             href="/api/auth/logout"
-            className="flex items-center gap-2 font-mono text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-2 font-mono text-sm bg-card bevel px-3 py-1 text-card-foreground hover:bg-muted transition-colors"
           >
-            <DoorOpen className="w-4 h-4" />
             {t("logout")}
           </a>
           <ThemeToggle />
+          <LuteToggle />
           <div className="flex gap-1">
             {LANGS.map((lang) => {
               const active = getLanguage() === lang.code;
@@ -108,10 +105,10 @@ export default function Home({ user, users }: Props) {
                 <button
                   key={lang.code}
                   onClick={() => handleLangChange(lang.code)}
-                  className={`font-mono text-xs px-3 py-1 rounded-sm border transition-colors ${
+                  className={`font-mono text-xs px-3 py-1 bevel transition-colors ${
                     active
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-card text-card-foreground hover:bg-muted"
                   }`}
                 >
                   {lang.label}
@@ -120,146 +117,174 @@ export default function Home({ user, users }: Props) {
             })}
           </div>
         </div>
-        <h1 className="text-5xl md:text-7xl font-display font-extrabold tracking-wide uppercase text-gold">
-          {title}
-        </h1>
-        <p className="font-mono text-muted-foreground tracking-widest uppercase text-sm md:text-base">
+        <div className="flex items-center justify-center gap-4">
+          <img
+            src="/gifs/dragon.gif"
+            alt="A flapping dragon"
+            width={150}
+            height={150}
+            className="w-[100px] md:w-[150px] h-auto"
+          />
+          <h1 className="heading-kitsch text-5xl md:text-7xl text-gold drop-shadow-[0_2px_0_rgba(0,0,0,0.8)]">
+            {title}
+          </h1>
+        </div>
+        <p className="font-mono text-card-foreground tracking-widest uppercase text-sm md:text-base">
           {t("subtitle")}
         </p>
       </header>
 
+      <div className="mb-11">
+        <HearYeMarquee transfers={transfers} />
+      </div>
+
       <div className="grid md:grid-cols-2 gap-8">
         {/* Red Brick — Honor */}
-        <div className="relative group">
-          <div className="relative h-full bg-card border-2 border-honor/40 rounded-sm p-8 flex flex-col items-center text-center space-y-6 overflow-hidden transition-all duration-500 hover:opacity-90 hover:-rotate-1">
-            <Ornament position="top-left" size="md" />
-            <Ornament position="top-right" size="md" />
-            <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{ clipPath: "url(#heater-shield)" }}>
-              <div className="w-full h-full bg-honor" />
-            </div>
-            <div className="p-2">
-              <img
-                src="/red-brick.png"
-                alt="Red Lego Brick"
-                className="w-24 h-24 object-contain drop-shadow-[0_4px_16px_rgba(220,38,38,0.3)]"
-              />
-            </div>
-            <div className="space-y-2">
-              <h2 className="text-2xl font-display font-bold uppercase tracking-wide text-honor">
+        <div className="relative">
+          <img
+            src="/gifs/torch.gif"
+            alt="A burning torch"
+            width={65}
+            height={128}
+            className="absolute -left-8 top-6 hidden md:block"
+          />
+          <div className="bevel bg-muted p-1.5">
+            <div className="bevel-in mb-1.5 flex items-center gap-2 bg-gradient-to-b from-[#8a3b34] to-[#571f1a] px-2 py-1">
+              <img src="/gifs/swords.gif" alt="" width={81} height={109} className="h-5 w-auto" />
+              <span className="font-display text-lg leading-none text-[#f3e2c8]">
                 {t("honor.name")}
-              </h2>
-              <p className="text-muted-foreground font-mono text-sm uppercase tracking-widest">
+              </span>
+              <span className="ml-auto font-mono text-[10px] text-[#f3e2c8]/70">
+                HONOR.EXE
+              </span>
+            </div>
+            <div className="bevel-in bg-card p-6 flex flex-col items-center text-center space-y-5">
+              <div className="bevel-in bg-muted p-4">
+                <img
+                  src="/red-brick.png"
+                  alt="Red Lego Brick"
+                  className="w-24 h-24 object-contain drop-shadow-[0_4px_16px_rgba(220,38,38,0.3)]"
+                />
+              </div>
+              <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
                 {t("honor.heldBy")}
               </p>
-              <div className="text-4xl font-serif font-black text-foreground py-2">
+              <div className="bevel-in w-full bg-[#101010] px-4 py-2 text-2xl font-bold text-[#ffd76e]">
                 {redBrick?.holderName || "—"}
               </div>
-            </div>
-            <div className="w-full pt-4 mt-auto space-y-3 border-t border-honor/20">
-              {isRedHolder ? (
-                <>
-                  <p className="text-xs font-mono uppercase text-honor/70 tracking-widest">
-                    {t("honor.transferTo")}
+              <div className="w-full space-y-3 border-t-2 border-honor/30 pt-4">
+                {isRedHolder ? (
+                  <>
+                    <p className="text-xs font-mono uppercase text-honor/80 tracking-widest">
+                      {t("honor.transferTo")}
+                    </p>
+                    <div className="flex gap-3 justify-center flex-wrap">
+                      {users
+                        .filter((u) => u.id !== user.id)
+                        .map((friend) => (
+                          <Button
+                            key={friend.id}
+                            variant="outline"
+                            className="flex-1 bg-card text-honor hover:bg-honor hover:text-primary-foreground"
+                            onClick={() =>
+                              setModal({
+                                color: "red",
+                                recipientId: friend.id,
+                                recipientName: friend.username,
+                              })
+                            }
+                            disabled={pending}
+                          >
+                            {friend.username}
+                          </Button>
+                        ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm font-mono text-honor/70 uppercase tracking-widest">
+                    {t("honor.waitingForTransfer").replace("{name}", redBrick?.holderName || "someone")}
                   </p>
-                  <div className="flex gap-3 justify-center flex-wrap">
-                    {users
-                      .filter((u) => u.id !== user.id)
-                      .map((friend) => (
-                        <Button
-                          key={friend.id}
-                          variant="outline"
-                          className="flex-1 border-honor/40 text-honor hover:bg-honor hover:text-primary-foreground transition-colors"
-                          onClick={() =>
-                            setModal({
-                              color: "red",
-                              recipientId: friend.id,
-                              recipientName: friend.username,
-                            })
-                          }
-                          disabled={pending}
-                        >
-                          {friend.username}
-                        </Button>
-                      ))}
-                  </div>
-                </>
-              ) : (
-                <p className="text-sm font-mono text-honor/50 uppercase tracking-widest">
-                  {t("honor.waitingForTransfer").replace("{name}", redBrick?.holderName || "someone")}
-                </p>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>
 
         {/* Blue Brick — Shame */}
-        <div className="relative group">
-          <div className="relative h-full bg-card border-2 border-shame/40 rounded-sm p-8 flex flex-col items-center text-center space-y-6 overflow-hidden transition-all duration-500 hover:opacity-90 hover:-rotate-1">
-            <Ornament position="top-left" size="md" />
-            <Ornament position="top-right" size="md" />
-            <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{ clipPath: "url(#heater-shield)" }}>
-              <div className="w-full h-full bg-shame" />
-            </div>
-            <div className="p-2">
-              <img
-                src="/blue-brick.png"
-                alt="Blue Lego Brick"
-                className="w-24 h-24 object-contain drop-shadow-[0_4px_16px_rgba(6,182,212,0.3)]"
-              />
-            </div>
-            <div className="space-y-2">
-              <h2 className="text-2xl font-display font-bold uppercase tracking-wide text-shame">
+        <div className="relative">
+          <img
+            src="/gifs/torch.gif"
+            alt="A burning torch"
+            width={65}
+            height={128}
+            className="absolute -right-8 top-6 hidden md:block"
+          />
+          <div className="bevel bg-muted p-1.5">
+            <div className="bevel-in mb-1.5 flex items-center gap-2 bg-gradient-to-b from-[#2f3567] to-[#141838] px-2 py-1">
+              <img src="/gifs/skull.gif" alt="" width={100} height={100} className="h-5 w-auto" />
+              <span className="font-display text-lg leading-none text-[#d6dcff]">
                 {t("shame.name")}
-              </h2>
-              <p className="text-muted-foreground font-mono text-sm uppercase tracking-widest">
+              </span>
+              <span className="ml-auto font-mono text-[10px] text-[#d6dcff]/70">
+                SHAME.EXE
+              </span>
+            </div>
+            <div className="bevel-in bg-card p-6 flex flex-col items-center text-center space-y-5">
+              <div className="bevel-in bg-muted p-4">
+                <img
+                  src="/blue-brick.png"
+                  alt="Blue Lego Brick"
+                  className="w-24 h-24 object-contain drop-shadow-[0_4px_16px_rgba(6,182,212,0.3)]"
+                />
+              </div>
+              <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
                 {t("shame.cursedUpon")}
               </p>
-              <div className="text-4xl font-serif font-black text-foreground py-2">
+              <div className="bevel-in w-full bg-[#101010] px-4 py-2 text-2xl font-bold text-[#8fb6ff]">
                 {blueBrick?.holderName || "—"}
               </div>
-            </div>
-            <div className="w-full pt-4 mt-auto space-y-3 border-t border-shame/20">
-              {isBlueHolder ? (
-                <>
-                  <p className="text-xs font-mono uppercase text-shame/70 tracking-widest">
-                    {t("shame.offloadTo")}
+              <div className="w-full space-y-3 border-t-2 border-shame/30 pt-4">
+                {isBlueHolder ? (
+                  <>
+                    <p className="text-xs font-mono uppercase text-shame/80 tracking-widest">
+                      {t("shame.offloadTo")}
+                    </p>
+                    <div className="flex gap-3 justify-center flex-wrap">
+                      {users
+                        .filter((u) => u.id !== user.id)
+                        .map((friend) => (
+                          <Button
+                            key={friend.id}
+                            variant="outline"
+                            className="flex-1 bg-card text-shame hover:bg-shame hover:text-primary-foreground"
+                            onClick={() =>
+                              setModal({
+                                color: "blue",
+                                recipientId: friend.id,
+                                recipientName: friend.username,
+                              })
+                            }
+                            disabled={pending}
+                          >
+                            {friend.username}
+                          </Button>
+                        ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm font-mono text-shame/70 uppercase tracking-widest">
+                    {t("shame.waitingForTransfer").replace("{name}", blueBrick?.holderName || "someone")}
                   </p>
-                  <div className="flex gap-3 justify-center flex-wrap">
-                    {users
-                      .filter((u) => u.id !== user.id)
-                      .map((friend) => (
-                        <Button
-                          key={friend.id}
-                          variant="outline"
-                          className="flex-1 border-shame/40 text-shame hover:bg-shame hover:text-primary-foreground transition-colors"
-                          onClick={() =>
-                            setModal({
-                              color: "blue",
-                              recipientId: friend.id,
-                              recipientName: friend.username,
-                            })
-                          }
-                          disabled={pending}
-                        >
-                          {friend.username}
-                        </Button>
-                      ))}
-                  </div>
-                </>
-              ) : (
-                <p className="text-sm font-mono text-shame/50 uppercase tracking-widest">
-                  {t("shame.waitingForTransfer").replace("{name}", blueBrick?.holderName || "someone")}
-                </p>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Divider ornament */}
-      <div className="relative py-4 flex items-center justify-center">
-        <div className="w-full h-px bg-gradient-to-r from-transparent via-gold/40 to-transparent" />
-        <span className="absolute px-4 text-gold/60 bg-background text-lg">❦</span>
+      {/* Rainbow divider */}
+      <div className="my-12">
+        <div className="rainbow-bar" />
       </div>
 
       {/* Transfer Modal */}
@@ -274,6 +299,27 @@ export default function Home({ user, users }: Props) {
 
       {/* Chronicles */}
       <ChroniclesView key={chroniclesKey} currentUser={user} />
+
+      {/* Footer furniture */}
+      <footer className="mt-14 mb-6">
+        <div className="footer-furniture px-6 py-5">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <VisitorCounter />
+            <div className="pt-1">
+              <WebringFooter />
+            </div>
+            <div className="pt-2">
+              <Badges88 />
+            </div>
+            <p className="fine-print opacity-80 max-w-md">
+              {t("footer.bestViewed")}
+            </p>
+            <div className="pt-3">
+              <ConstructionBadge />
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
