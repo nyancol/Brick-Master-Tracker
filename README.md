@@ -68,7 +68,7 @@ flowchart LR
 ├── build-server.mjs            # esbuild → dist/server.mjs
 ├── index.html                  # HTML shell
 ├── .env.example                # PORT, DB_PATH
-├── shell.nix                   # Nix dev shell (node, pnpm, gcc, make)
+├── mise.toml                     # Dev tools (node, pnpm, python, nvim, opencode, openspec)
 │
 ├── shared/
 │   └── constants.ts            # FRIENDS array — single source of truth
@@ -153,12 +153,6 @@ pnpm dev
 # Open http://localhost:5173/api/api-docs
 ```
 
-### Production
-
-```bash
-pnpm build && pnpm start
-# Open http://localhost:5000/api/api-docs
-```
 
 ### Raw spec
 
@@ -180,7 +174,7 @@ The raw OpenAPI specification is available as JSON at `/api/api-docs.json`.
 | **Validation** | Manual input checks |
 | **Logging** | `console.log` |
 | **Container** | Docker multi-stage (Alpine) |
-| **Dev env** | Nix shell (node, pnpm, gcc) |
+| **Dev env** | mise (node, pnpm, python) |
 
 ---
 
@@ -188,15 +182,16 @@ The raw OpenAPI specification is available as JSON at `/api/api-docs.json`.
 
 ### Prerequisites
 
-**Option A — Nix (recommended):**
+[mise](https://mise.jdx.dev/) manages Node.js, pnpm, Python, Neovim, opencode, and openspec.
+Enable mise shims once (add to your shell rc):
+
 ```bash
-nix-shell shell.nix
+mise activate bash   # or zsh/fish
+mise install         # then, inside the project
 ```
 
-**Option B — Manual:**
-- Node.js 22+
-- pnpm 9+
-- C compiler + make (for better-sqlite3 native addon)
+Git plus a C compiler and make are expected from the system (only needed if
+`better-sqlite3` has no prebuilt binary for your platform).
 
 ### Getting started
 
