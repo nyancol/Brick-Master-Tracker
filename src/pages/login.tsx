@@ -25,26 +25,42 @@ export default function Login() {
   const showDevPicker = devInfo?.enabled && devInfo.users.length > 0;
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center space-y-8">
+    <div className="min-h-screen flex flex-col items-center justify-center space-y-8 p-4">
       <div className="text-center space-y-4">
-        <h1 className="text-5xl md:text-7xl font-display font-extrabold tracking-wide uppercase text-gold">
-          {t("title")}
-        </h1>
-        <p className="font-mono text-muted-foreground tracking-widest uppercase text-sm">
+        <div className="flex items-center justify-center gap-4">
+          <img
+            src="/gifs/dragon.gif"
+            alt="A flapping dragon"
+            width={150}
+            height={150}
+            className="w-[90px] md:w-[150px] h-auto"
+          />
+          <h1 className="heading-kitsch text-5xl md:text-7xl text-gold">
+            {t("title")}
+          </h1>
+        </div>
+        <p className="font-mono text-card-foreground tracking-widest uppercase text-sm">
           {t("subtitle")}
         </p>
       </div>
 
+      <img
+        src="/gifs/gate.gif"
+        alt="The castle gate stands open"
+        width={220}
+        height={162}
+      />
+
       <a
         href="/api/auth/login"
-        className="inline-flex items-center gap-2 px-8 py-4 bg-primary text-primary-foreground rounded-sm border border-primary font-bold uppercase tracking-wider hover:opacity-90 transition-opacity"
+        className="bevel bg-primary text-primary-foreground px-8 py-4 font-bold uppercase tracking-wider hover:bg-muted hover:text-foreground transition-colors"
       >
-        Sign in
+        {t("login.signIn")}
       </a>
 
       {showDevPicker && (
         <div className="flex flex-col items-center gap-3">
-          <div className="font-mono text-xs text-muted-foreground uppercase tracking-widest">
+          <div className="font-mono text-xs text-card-foreground uppercase tracking-widest">
             Dev test users
           </div>
           <div className="flex gap-2 flex-wrap justify-center">
@@ -53,7 +69,7 @@ export default function Login() {
                 key={user.username}
                 onClick={() => handleDevLogin(user.username)}
                 disabled={pending}
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-sm border border-border text-sm font-bold uppercase tracking-wider hover:border-primary hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bevel bg-card text-card-foreground px-6 py-3 text-sm font-bold uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {user.displayName}
               </button>

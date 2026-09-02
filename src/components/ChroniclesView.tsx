@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { format } from "date-fns";
-import { ScrollText, ArrowRight, ChevronDown, ChevronUp, Feather, Scroll, Trash2 } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronUp, Feather, Scroll, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTransfers, fetchTransferStory, editStory, uploadTransferImage, deleteTransferImage, type Transfer, type TransferStory, type TransferImage, type AuthUser } from "@/api";
 import { t } from "@/hooks/use-translation";
@@ -41,13 +41,19 @@ export default function ChroniclesView({ currentUser }: Props) {
     return (
       <div>
         <div className="flex items-center gap-3 mb-8 pb-3 border-b-2 border-gold/30">
-          <ScrollText className="w-6 h-6 text-gold" />
-          <h3 className="text-xl font-bold font-display uppercase tracking-wider text-gold">
+          <img
+            src="/gifs/scroll-seal.gif"
+            alt="A sealed scroll"
+            width={70}
+            height={90}
+            className="-my-4"
+          />
+          <h3 className="text-3xl font-display text-gold">
             {t("chronicles.title")}
           </h3>
         </div>
-        <div className="text-center py-12 bg-card rounded-sm border border-border outline outline-1 outline-border -outline-offset-1">
-          <p className="font-serif text-muted-foreground italic">
+        <div className="rounded-none bg-card bevel border border-border">
+          <p className="font-serif text-muted-foreground italic text-center py-12">
             {t("chronicles.empty")}
           </p>
         </div>
@@ -67,8 +73,14 @@ export default function ChroniclesView({ currentUser }: Props) {
   return (
     <div className="pt-8">
       <div className="flex items-center gap-3 mb-8 pb-3 border-b-2 border-gold/30">
-        <ScrollText className="w-6 h-6 text-gold" />
-        <h3 className="text-xl font-bold font-display uppercase tracking-wider text-gold">
+        <img
+          src="/gifs/scroll-seal.gif"
+          alt="A sealed scroll"
+          width={70}
+          height={90}
+          className="-my-4"
+        />
+        <h3 className="text-3xl font-display text-gold">
           {t("chronicles.title")}
         </h3>
       </div>
@@ -133,7 +145,7 @@ function ChronicleEntry({
   }, [expanded, story, transfer.id]);
 
   return (
-    <div className="rounded-sm bg-card border border-border outline outline-1 outline-border -outline-offset-1 hover:border-gold/30 transition-colors overflow-hidden">
+    <div className="rounded-none bg-card bevel border border-border hover:border-gold/40 transition-colors overflow-hidden">
       <button
         onClick={handleToggle}
         className="w-full flex items-center justify-between p-4 text-left"
@@ -266,7 +278,7 @@ function StoryDisplay({
   return (
     <div className="space-y-2">
       <div className="flex items-start justify-between gap-2">
-        <p className="font-serif italic text-sm leading-relaxed">{story.description}</p>
+        <p className="dropcap font-serif italic text-sm leading-relaxed">{story.description}</p>
         {isSender && (
           <button
             onClick={() => setEditing(true)}

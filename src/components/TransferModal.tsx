@@ -104,19 +104,20 @@ export default function TransferModal({ color, recipientName, onConfirm, onCance
   }, [description, images, onConfirm]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="relative w-full max-w-lg bg-card border border-gold/40 rounded-sm p-6 space-y-6 shadow-2xl animate-seal-stamp">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
+      <div className="relative w-full max-w-lg bg-card bevel border-2 border-gold/50 p-6 space-y-6 shadow-2xl animate-seal-stamp">
         <Ornament position="top-left" size="sm" />
         <Ornament position="top-right" size="sm" />
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-display font-bold uppercase tracking-wide text-gold">
-            {t("honor.transferTo")} {recipientName}
+          <h2 className="text-2xl font-display text-gold">
+            {color === "red" ? t("honor.transferTo") : t("shame.offloadTo")} {recipientName}
           </h2>
           <button
             onClick={onCancel}
-            className="text-muted-foreground hover:text-foreground transition-colors"
+            className="bevel bg-card text-card-foreground px-1.5 py-0.5 text-xs font-mono"
+            aria-label="Close"
           >
-            <X className="w-5 h-5" />
+            ✕
           </button>
         </div>
 
@@ -127,7 +128,7 @@ export default function TransferModal({ color, recipientName, onConfirm, onCance
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="w-full h-32 bg-muted border border-border rounded-sm p-4 text-foreground font-serif text-sm resize-none focus:outline-none focus:border-gold/50 transition-colors"
+            className="w-full h-32 bg-muted bevel-in border border-border p-4 text-foreground font-serif text-sm resize-none focus:outline-none focus:border-gold/60"
             placeholder={t("modal.descriptionLabel")}
           />
           {!description.trim() && (
@@ -157,7 +158,7 @@ export default function TransferModal({ color, recipientName, onConfirm, onCance
           {images.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {images.map((img, idx) => (
-                <div key={idx} className="relative w-20 h-20 rounded-sm overflow-hidden border border-gold/30 group">
+                <div key={idx} className="relative w-20 h-20 rounded-none overflow-hidden bevel border border-gold/30 group">
                   {img.status === "done" && (
                     <>
                       <img src={img.preview} alt="" className="w-full h-full object-cover" />

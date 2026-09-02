@@ -3,17 +3,17 @@ import { cn } from "@/lib/utils";
 import { type ButtonHTMLAttributes, forwardRef } from "react";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-sm text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-none text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground border border-primary",
+          "bevel bg-primary text-primary-foreground",
         outline:
-          "border border-border text-foreground shadow-xs hover:bg-muted active:shadow-none",
+          "bevel bg-card text-foreground hover:bg-muted",
         ghost: "border border-transparent hover:bg-muted",
         heraldic:
-          "bg-gold text-background border border-gold font-display uppercase tracking-wider hover:opacity-90 active:opacity-80",
+          "bevel bg-gold text-background font-display text-lg hover:opacity-90 active:opacity-80",
       },
       size: {
         default: "min-h-9 px-4 py-2",

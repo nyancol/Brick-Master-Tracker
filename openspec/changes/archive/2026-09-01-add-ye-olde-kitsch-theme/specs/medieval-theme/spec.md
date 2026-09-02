@@ -1,8 +1,4 @@
-## Purpose
-
-This spec defines the medieval manuscript-inspired visual design system for the Brick Master Tracker, covering dual light/dark palettes, typography, textures, ornamentation, icons, chronicles layout, animations, and page themes.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Dual Palette Theme Toggle
 The application SHALL support two visual themes — Day (light, castle-stone wall) and Dungeon (dark, starfield) — and SHALL activate automatically based on the user's device `prefers-color-scheme` preference, with the option for the user to manually override via a theme toggle.
@@ -81,25 +77,6 @@ The application SHALL combine period animated GIFs, Win98-style bevel chrome, an
 - **WHEN** an interactive element receives keyboard focus
 - **THEN** the focus ring SHALL remain the golden liseré (gold pulse animation)
 
-### Requirement: Heraldic Icon Mapping
-The application SHALL use medieval-appropriate Lucide icon names throughout the UI, replacing the current cyberpunk-aligned icon choices without changing the icon library.
-
-#### Scenario: User avatar replacement
-- **WHEN** a user display name is shown with an icon
-- **THEN** the Shield icon SHALL be used in place of the User icon
-
-#### Scenario: Chronicle section icon
-- **WHEN** the Chronicles section header is rendered
-- **THEN** the ScrollText icon SHALL be used in place of the BookOpen icon
-
-#### Scenario: Edit action icon
-- **WHEN** an inline edit button is rendered
-- **THEN** the Feather icon SHALL be used in place of the Pencil icon
-
-#### Scenario: Logout icon
-- **WHEN** the logout link is rendered
-- **THEN** the DoorOpen icon SHALL be used in place of the LogOut icon
-
 ### Requirement: Chronicles Illuminated Layout
 The Chronicles section SHALL resemble a GeoCities-era illuminated manuscript page, with decorative year headings in Roman numerals, parchment entry cards with visible seams, illuminated drop caps, and period GIF ornamentation.
 
@@ -157,16 +134,7 @@ The login page and 404 page SHALL adopt the kitsch theme with blackletter titles
 - **WHEN** the not-found page is rendered
 - **THEN** it SHALL use the kitsch card styling with blackletter title and themed copy ("Halt! Who goes there?")
 
-### Requirement: Brick Presentation Preservation
-The red and blue brick images, names, and their visual identity SHALL remain unchanged — they act as modern relics displayed within heraldic framing.
-
-#### Scenario: Brick image display
-- **WHEN** a brick card is rendered
-- **THEN** the existing brick PNG images (`/red-brick.png`, `/blue-brick.png`) SHALL be displayed without visual modification
-
-#### Scenario: Brick naming
-- **WHEN** brick names are displayed
-- **THEN** the existing i18n keys for honor/shame brick names SHALL be used without modification to their text content
+## ADDED Requirements
 
 ### Requirement: Kitsch Page Furniture
 The application SHALL include classic 1998 page furniture: a scrolling "Hear Ye!" herald marquee, an odometer visitor counter, a "Ye Olde Brick Webring" footer, a "Best viewed in Netscape Navigator 4.0 at 800×600" badge, 88×31 web buttons, and an "Under construction by þe King's Masons" badge.
