@@ -381,9 +381,91 @@ a.bevel:active {
   font-size: 0.72rem;
 }
 
+/* ---- Marginalia: medieval ink palette (Day on parchment) ---- */
+.ink-iron-gall { color: #3b2f2f; }
+.ink-red-ochre { color: #8c3a2b; }
+.ink-lapis { color: #2a3d8f; }
+.ink-verdigris { color: #2e6e5e; }
+.ink-oak-gall { color: #2f2a30; }
+.ink-sepia { color: #6b4f2a; }
+.ink-graphite { color: #4a4a4a; }
+
+/* ---- Marginalia: inks in Ye Dungeon (raised for starfield cards) ---- */
+.dark .ink-iron-gall { color: #cfa98a; }
+.dark .ink-red-ochre { color: #e08a6d; }
+.dark .ink-lapis { color: #93a7ea; }
+.dark .ink-verdigris { color: #82c6ae; }
+.dark .ink-oak-gall { color: #b8b1c9; }
+.dark .ink-sepia { color: #d3b487; }
+.dark .ink-graphite { color: #9a9a9a; }
+
+/* ---- Marginalia: blotted gloss (struck, barely legible) ---- */
+.gloss-blotted {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  filter: blur(0.7px);
+  opacity: 0.45;
+  font-style: italic;
+}
+
+/* ---- Marginalia: wax seal avatar discs ---- */
+.wax-seal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+  font-family: var(--font-display);
+  font-size: 12px;
+  line-height: 1;
+  color: rgba(0, 0, 0, 0.75);
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  box-shadow: inset -1px -2px 3px rgba(0, 0, 0, 0.35),
+    inset 1px 1px 2px rgba(255, 255, 255, 0.3);
+}
+.wax-seal--knight {
+  background: radial-gradient(circle at 35% 30%, #e8c96a, #a8862e 70%, #8a6b1e);
+}
+.wax-seal--visitor {
+  background: radial-gradient(circle at 35% 30%, #a89a8a, #6e6357 70%);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* ---- Marginalia: huzzah micro-pop ---- */
+@keyframes huzzah-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.35) rotate(6deg); }
+  100% { transform: scale(1); }
+}
+.huzzah-pop {
+  animation: huzzah-pop 0.35s ease-out;
+}
+
+/* ---- Marginalia: action stamp (small beveled button, brass plate) ---- */
+.stamp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  font-family: var(--app-font-mono);
+  font-size: 10px;
+  line-height: 1.4;
+  background: hsl(var(--muted));
+  color: hsl(var(--gold));
+  cursor: pointer;
+  transition: none;
+}
+.stamp-btn:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-unfurl,
-  .animate-seal-stamp {
+  .animate-seal-stamp,
+  .huzzah-pop {
     animation: none;
   }
 }

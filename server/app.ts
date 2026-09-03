@@ -168,6 +168,31 @@ const upload = multer({
  *         uploadedAt:
  *           type: string
  *           format: date-time
+ *     TransferComment:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *         authorId:
+ *           type: integer
+ *         authorName:
+ *           type: string
+ *         authorRole:
+ *           type: string
+ *           enum: [knight, visitor]
+ *         body:
+ *           type: string
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         blottedAt:
+ *           type: string
+ *           format: date-time
+ *           nullable: true
+ *         huzzahCount:
+ *           type: integer
+ *         huzzahedByMe:
+ *           type: boolean
  *     Error:
  *       type: object
  *       properties:
@@ -225,6 +250,7 @@ const swaggerSpec = swaggerJsdoc({
       { name: "Authentication", description: "Login, logout, and session management" },
       { name: "Bricks", description: "Current brick state and holder info" },
       { name: "Transfers", description: "Transfer history, stories, and brick transfer actions" },
+      { name: "Marginalia", description: "Glosses (comments) on chronicle entries" },
       { name: "Uploads", description: "Image upload and management for transfer stories" },
     ],
     components: {
@@ -1464,6 +1490,444 @@ app.delete("/transfers/:id/images/:imageId", requireAuth, (req, res) => {
     res.json({ deleted: true });
   } catch (err) {
     console.error("DELETE /transfers/:id/images/:imageId failed:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /transfers/:id/comments — marginalia glosses (oldest first)
+/**
+ * @openapi
+ * /transfers/{id}/comments:
+ *   get:
+ *     tags: [Marginalia]
+ *     summary: List glosses on a chronicle entry
+ *     operationId: getTransferComments
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Transfer ID
+ *     responses:
+ *       200:
+ *         description: Glosses ordered chronologically (oldest first)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: "#/components/schemas/TransferComment"
+ *       404:
+ *         description: Transfer not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ */
+app.get("/transfers/:id/comments", requireAuth, (req, res) => {
+  try {
+    const transferId = Number(req.params.id);
+    const userId = req.session.user!.id;
+
+    const transfer = db
+      .prepare("SELECT id FROM transfer_history WHERE id = ?")
+      .get(transferId);
+    if (!transfer) {
+      res.status(404).json({ error: "Transfer not found" });
+      return;
+    }
+
+    const rows = db
+      .prepare(
+        `SELECT c.id, c.author_id, u.username as author_name, u.role as author_role,
+                c.body, c.created_at, c.blotted_at,
+                (SELECT COUNT(*) FROM transfer_comment_huzzahs h WHERE h.comment_id = c.id) as huzzah_count,
+                EXISTS(SELECT 1 FROM transfer_comment_huzzahs h2 WHERE h2.comment_id = c.id AND h2.user_id = ?) as huzzahed_by_me
+         FROM transfer_comments c
+         JOIN users u ON c.author_id = u.id
+         WHERE c.transfer_id = ?
+         ORDER BY c.created_at ASC, c.id ASC`,
+      )
+      .all(userId, transferId) as Array<{
+      id: number;
+      author_id: number;
+      author_name: string | null;
+      author_role: string;
+      body: string;
+      created_at: number;
+      blotted_at: number | null;
+      huzzah_count: number;
+      huzzahed_by_me: 0 | 1;
+    }>;
+
+    res.json(
+      rows.map((r) => ({
+        id: r.id,
+        authorId: r.author_id,
+        authorName: r.author_name ?? "Unknown",
+        authorRole: r.author_role === "visitor" ? "visitor" : "knight",
+        body: r.body,
+        createdAt: new Date(r.created_at).toISOString(),
+        blottedAt: r.blotted_at === null ? null : new Date(r.blotted_at).toISOString(),
+        huzzahCount: r.huzzah_count,
+        huzzahedByMe: r.huzzahed_by_me === 1,
+      })),
+    );
+  } catch (err) {
+    console.error("GET /transfers/:id/comments failed:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /transfers/:id/comments — inscribe a gloss (any authenticated role)
+/**
+ * @openapi
+ * /transfers/{id}/comments:
+ *   post:
+ *     tags: [Marginalia]
+ *     summary: Inscribe a gloss on a chronicle entry
+ *     operationId: addTransferComment
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Transfer ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [body]
+ *             properties:
+ *               body:
+ *                 type: string
+ *                 description: Gloss text (1-500 characters after trimming)
+ *     responses:
+ *       200:
+ *         description: The created gloss
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/TransferComment"
+ *       400:
+ *         description: Empty or overlong gloss
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ *       404:
+ *         description: Transfer not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ */
+app.post("/transfers/:id/comments", requireAuth, (req, res) => {
+  try {
+    const transferId = Number(req.params.id);
+    const userId = req.session.user!.id;
+    const { body } = req.body;
+
+    if (typeof body !== "string" || !body.trim()) {
+      res.status(400).json({ error: "Gloss must be a non-empty string" });
+      return;
+    }
+    const trimmed = body.trim();
+    if (trimmed.length > 500) {
+      res.status(400).json({ error: "Gloss must be 500 characters or fewer" });
+      return;
+    }
+
+    const transfer = db
+      .prepare("SELECT id FROM transfer_history WHERE id = ?")
+      .get(transferId);
+    if (!transfer) {
+      res.status(404).json({ error: "Transfer not found" });
+      return;
+    }
+
+    const now = Date.now();
+    const info = db
+      .prepare(
+        "INSERT INTO transfer_comments (transfer_id, author_id, body, created_at) VALUES (?, ?, ?, ?)",
+      )
+      .run(transferId, userId, trimmed, now);
+
+    const user = db
+      .prepare("SELECT username, role FROM users WHERE id = ?")
+      .get(userId) as { username: string; role: string };
+
+    res.json({
+      id: info.lastInsertRowid as number,
+      authorId: userId,
+      authorName: user.username,
+      authorRole: user.role === "visitor" ? "visitor" : "knight",
+      body: trimmed,
+      createdAt: new Date(now).toISOString(),
+      blottedAt: null,
+      huzzahCount: 0,
+      huzzahedByMe: false,
+    });
+  } catch (err) {
+    console.error("POST /transfers/:id/comments failed:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /transfers/:id/comments/:commentId/huzzah — one-shot reaction
+/**
+ * @openapi
+ * /transfers/{id}/comments/{commentId}/huzzah:
+ *   post:
+ *     tags: [Marginalia]
+ *     summary: Proclaim "Huzzah!" on a gloss (at most once per user)
+ *     operationId: huzzahTransferComment
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Transfer ID
+ *       - in: path
+ *         name: commentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Comment ID
+ *     responses:
+ *       200:
+ *         description: Huzzah recorded, returns the updated count
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 huzzahCount:
+ *                   type: integer
+ *       404:
+ *         description: Gloss not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ *       409:
+ *         description: Already huzzahed, or the gloss is blotted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ */
+app.post("/transfers/:id/comments/:commentId/huzzah", requireAuth, (req, res) => {
+  try {
+    const transferId = Number(req.params.id);
+    const commentId = Number(req.params.commentId);
+    const userId = req.session.user!.id;
+
+    const comment = db
+      .prepare("SELECT id, blotted_at FROM transfer_comments WHERE id = ? AND transfer_id = ?")
+      .get(commentId, transferId) as { id: number; blotted_at: number | null } | undefined;
+    if (!comment) {
+      res.status(404).json({ error: "Gloss not found" });
+      return;
+    }
+    if (comment.blotted_at !== null) {
+      res.status(409).json({ error: "This gloss is blotted" });
+      return;
+    }
+
+    try {
+      db.prepare(
+        "INSERT INTO transfer_comment_huzzahs (comment_id, user_id, created_at) VALUES (?, ?, ?)",
+      ).run(commentId, userId, Date.now());
+    } catch (insertErr) {
+      const code = (insertErr as { code?: string }).code ?? "";
+      if (code.startsWith("SQLITE_CONSTRAINT")) {
+        res.status(409).json({ error: "Thou hast already proclaimed thy huzzah!" });
+        return;
+      }
+      throw insertErr;
+    }
+
+    const count = db
+      .prepare("SELECT COUNT(*) as n FROM transfer_comment_huzzahs WHERE comment_id = ?")
+      .get(commentId) as { n: number };
+
+    res.json({ huzzahCount: count.n });
+  } catch (err) {
+    console.error("POST /transfers/:id/comments/:commentId/huzzah failed:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /transfers/:id/comments/:commentId/blot — author-only soft delete
+/**
+ * @openapi
+ * /transfers/{id}/comments/{commentId}/blot:
+ *   post:
+ *     tags: [Marginalia]
+ *     summary: Blot out a gloss (author only, soft delete)
+ *     operationId: blotTransferComment
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Transfer ID
+ *       - in: path
+ *         name: commentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Comment ID
+ *     responses:
+ *       200:
+ *         description: Gloss blotted, returns the blot timestamp
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 blottedAt:
+ *                   type: string
+ *                   format: date-time
+ *       403:
+ *         description: Only the author can blot
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ *       404:
+ *         description: Gloss not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ */
+app.post("/transfers/:id/comments/:commentId/blot", requireAuth, (req, res) => {
+  try {
+    const transferId = Number(req.params.id);
+    const commentId = Number(req.params.commentId);
+    const userId = req.session.user!.id;
+
+    const comment = db
+      .prepare("SELECT id, author_id, blotted_at FROM transfer_comments WHERE id = ? AND transfer_id = ?")
+      .get(commentId, transferId) as { id: number; author_id: number; blotted_at: number | null } | undefined;
+    if (!comment) {
+      res.status(404).json({ error: "Gloss not found" });
+      return;
+    }
+    if (comment.author_id !== userId) {
+      res.status(403).json({ error: "Only the author can blot this gloss" });
+      return;
+    }
+
+    const now = Date.now();
+    db.prepare(
+      "UPDATE transfer_comments SET blotted_at = ? WHERE id = ? AND blotted_at IS NULL",
+    ).run(now, commentId);
+
+    const row = db
+      .prepare("SELECT blotted_at FROM transfer_comments WHERE id = ?")
+      .get(commentId) as { blotted_at: number };
+
+    res.json({ blottedAt: new Date(row.blotted_at).toISOString() });
+  } catch (err) {
+    console.error("POST /transfers/:id/comments/:commentId/blot failed:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// DELETE /transfers/:id/comments/:commentId — author-only hard delete (chisel)
+/**
+ * @openapi
+ * /transfers/{id}/comments/{commentId}:
+ *   delete:
+ *     tags: [Marginalia]
+ *     summary: Chisel a blotted gloss from the record (author only, hard delete)
+ *     operationId: deleteTransferComment
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Transfer ID
+ *       - in: path
+ *         name: commentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Comment ID
+ *     responses:
+ *       200:
+ *         description: Gloss deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 deleted:
+ *                   type: boolean
+ *       403:
+ *         description: Only the author can chisel
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ *       404:
+ *         description: Gloss not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ */
+app.delete("/transfers/:id/comments/:commentId", requireAuth, (req, res) => {
+  try {
+    const transferId = Number(req.params.id);
+    const commentId = Number(req.params.commentId);
+    const userId = req.session.user!.id;
+
+    const comment = db
+      .prepare("SELECT id, author_id FROM transfer_comments WHERE id = ? AND transfer_id = ?")
+      .get(commentId, transferId) as { id: number; author_id: number } | undefined;
+    if (!comment) {
+      res.status(404).json({ error: "Gloss not found" });
+      return;
+    }
+    if (comment.author_id !== userId) {
+      res.status(403).json({ error: "Only the author can chisel this gloss" });
+      return;
+    }
+
+    db.transaction(() => {
+      db.prepare("DELETE FROM transfer_comments WHERE id = ?").run(commentId);
+    })();
+
+    res.json({ deleted: true });
+  } catch (err) {
+    console.error("DELETE /transfers/:id/comments/:commentId failed:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

@@ -56,6 +56,18 @@ export interface StagingImage {
   mimeType: string;
 }
 
+export interface TransferComment {
+  id: number;
+  authorId: number;
+  authorName: string;
+  authorRole: UserRole;
+  body: string;
+  createdAt: string;
+  blottedAt: string | null;
+  huzzahCount: number;
+  huzzahedByMe: boolean;
+}
+
 export interface AuthUser {
   id: number;
   email: string;
@@ -219,6 +231,52 @@ export async function deleteTransferImage(
   imageId: number,
 ): Promise<void> {
   await fetchJson(`/api/transfers/${transferId}/images/${imageId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function fetchTransferComments(
+  transferId: number,
+): Promise<TransferComment[]> {
+  return fetchJson<TransferComment[]>(`/api/transfers/${transferId}/comments`);
+}
+
+export async function addGloss(
+  transferId: number,
+  body: string,
+): Promise<TransferComment> {
+  return fetchJson<TransferComment>(`/api/transfers/${transferId}/comments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ body }),
+  });
+}
+
+export async function huzzahComment(
+  transferId: number,
+  commentId: number,
+): Promise<{ huzzahCount: number }> {
+  return fetchJson<{ huzzahCount: number }>(
+    `/api/transfers/${transferId}/comments/${commentId}/huzzah`,
+    { method: "POST" },
+  );
+}
+
+export async function blotComment(
+  transferId: number,
+  commentId: number,
+): Promise<{ blottedAt: string }> {
+  return fetchJson<{ blottedAt: string }>(
+    `/api/transfers/${transferId}/comments/${commentId}/blot`,
+    { method: "POST" },
+  );
+}
+
+export async function chiselComment(
+  transferId: number,
+  commentId: number,
+): Promise<void> {
+  await fetchJson(`/api/transfers/${transferId}/comments/${commentId}`, {
     method: "DELETE",
   });
 }

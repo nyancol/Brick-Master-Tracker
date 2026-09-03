@@ -50,3 +50,15 @@ export interface TransferImage {
   mimeType: string;
   uploadedAt: string;
 }
+
+export interface TransferComment {
+  id: number;
+  authorId: number;
+  authorName: string;
+  authorRole: UserRole;
+  body: string;
+  createdAt: string;
+  blottedAt: string | null;
+  huzzahCount: number;
+  huzzahedByMe: boolean;
+}

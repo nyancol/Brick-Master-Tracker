@@ -1,26 +1,12 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { format } from "date-fns";
-import { ArrowRight, ChevronDown, ChevronUp, Feather, Scroll, Trash2 } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronUp, Eraser, Feather, Hammer, Scroll, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useTransfers, fetchTransferStory, editStory, uploadTransferImage, deleteTransferImage, type Transfer, type TransferStory, type TransferImage, type AuthUser } from "@/api";
+import { useTransfers, fetchTransferStory, editStory, uploadTransferImage, deleteTransferImage, fetchTransferComments, addGloss, huzzahComment, blotComment, chiselComment, type Transfer, type TransferStory, type TransferImage, type TransferComment, type AuthUser } from "@/api";
+import { toRoman } from "@/lib/roman";
+import { inkFor, tiltFor, relativeGlossAge, daysPast, type InkName } from "@/lib/marginalia";
 import { t } from "@/hooks/use-translation";
 import { useToast } from "@/hooks/use-toast";
-
-function toRoman(num: number): string {
-  const map: [number, string][] = [
-    [1000, "M"], [900, "CM"], [500, "D"], [400, "CD"],
-    [100, "C"], [90, "XC"], [50, "L"], [40, "XL"],
-    [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"],
-  ];
-  let result = "";
-  for (const [value, numeral] of map) {
-    while (num >= value) {
-      result += numeral;
-      num -= value;
-    }
-  }
-  return result;
-}
 
 interface Props {
   currentUser: AuthUser;
@@ -222,6 +208,7 @@ function ChronicleEntry({
                   )
                 }
               />
+              <Marginalia transferId={transfer.id} currentUser={currentUser} />
             </>
           ) : null}
         </div>
@@ -425,6 +412,278 @@ function PhotoGallery({
           </Button>
         </>
       )}
+    </div>
+  );
+}
+
+function ageLabel(createdAt: string): string {
+  const created = new Date(createdAt).getTime();
+  const bucket = relativeGlossAge(created, Date.now());
+  if (bucket === "past") {
+    return t("marginalia.age.past").replace("{days}", toRoman(daysPast(created, Date.now())));
+  }
+  return t(`marginalia.age.${bucket}`);
+}
+
+function inkClass(ink: InkName): string {
+  return `ink-${ink}`;
+}
+
+function WaxSeal({ name, role }: { name: string; role: "knight" | "visitor" }) {
+  return (
+    <span
+      className={`wax-seal ${role === "knight" ? "wax-seal--knight" : "wax-seal--visitor"}`}
+      aria-hidden="true"
+    >
+      {(name[0] ?? "?").toUpperCase()}
+    </span>
+  );
+}
+
+function Marginalia({
+  transferId,
+  currentUser,
+}: {
+  transferId: number;
+  currentUser: AuthUser;
+}) {
+  const { toast } = useToast();
+  const [comments, setComments] = useState<TransferComment[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [text, setText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const refetch = useCallback(async () => {
+    try {
+      const result = await fetchTransferComments(transferId);
+      setComments(result);
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : String(err),
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [transferId, toast]);
+
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+
+  const handleInscribe = useCallback(async () => {
+    const body = text.trim();
+    if (!body || submitting) return;
+    setSubmitting(true);
+    try {
+      const created = await addGloss(transferId, body);
+      setText("");
+      setComments((cs) => (cs ? [...cs, created] : [created]));
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err);
+      toast({
+        title: "Error",
+        description: raw.includes("500")
+          ? t("marginalia.tooLong")
+          : raw,
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  }, [text, submitting, transferId, toast]);
+
+  const handleHuzzah = useCallback(
+    async (comment: TransferComment) => {
+      if (comment.huzzahedByMe) return;
+      try {
+        const { huzzahCount } = await huzzahComment(transferId, comment.id);
+        setComments((cs) =>
+          cs
+            ? cs.map((c) =>
+                c.id === comment.id
+                  ? { ...c, huzzahCount, huzzahedByMe: true }
+                  : c,
+              )
+            : cs,
+        );
+      } catch (err) {
+        const raw = err instanceof Error ? err.message : String(err);
+        toast({
+          title: "Error",
+          description: raw.toLowerCase().includes("huzzah")
+            ? t("marginalia.huzzahRebuke")
+            : raw,
+          variant: "destructive",
+        });
+        refetch();
+      }
+    },
+    [transferId, toast, refetch],
+  );
+
+  const handleBlot = useCallback(
+    async (comment: TransferComment) => {
+      if (!confirm(t("marginalia.confirmBlot"))) return;
+      try {
+        const { blottedAt } = await blotComment(transferId, comment.id);
+        setComments((cs) =>
+          cs
+            ? cs.map((c) =>
+                c.id === comment.id ? { ...c, blottedAt } : c,
+              )
+            : cs,
+        );
+      } catch (err) {
+        toast({
+          title: "Error",
+          description: err instanceof Error ? err.message : String(err),
+          variant: "destructive",
+        });
+      }
+    },
+    [transferId, toast],
+  );
+
+  const handleChisel = useCallback(
+    async (comment: TransferComment) => {
+      if (!confirm(t("marginalia.confirmChisel"))) return;
+      try {
+        await chiselComment(transferId, comment.id);
+        setComments((cs) =>
+          cs ? cs.filter((c) => c.id !== comment.id) : cs,
+        );
+      } catch (err) {
+        toast({
+          title: "Error",
+          description: err instanceof Error ? err.message : String(err),
+          variant: "destructive",
+        });
+        refetch();
+      }
+    },
+    [transferId, toast, refetch],
+  );
+
+  const glosses = comments ?? [];
+  const countLabel = t("marginalia.glossCount").replace(
+    "{count}",
+    toRoman(glosses.length),
+  );
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Feather className="w-4 h-4 text-gold/70" />
+        <span className="heading-kitsch font-display text-lg text-gold">
+          {t("marginalia.header")}
+        </span>
+        {glosses.length > 0 && (
+          <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground ml-1">
+            {countLabel}
+          </span>
+        )}
+      </div>
+
+      <div className="bevel-in group-box bg-muted/30 p-3 space-y-3">
+        {loading ? (
+          <p className="font-mono text-sm text-muted-foreground">{t("loading")}</p>
+        ) : glosses.length === 0 ? (
+          <p className="font-serif italic text-sm text-muted-foreground text-center py-2">
+            {t("marginalia.empty")}
+          </p>
+        ) : (
+          glosses.map((comment) => {
+            const ink = inkFor(comment.authorId, comment.authorRole);
+            const tilt = tiltFor(comment.authorId, comment.id);
+            const blotted = comment.blottedAt !== null;
+            const isMine = comment.authorId === currentUser.id;
+            return (
+              <div
+                key={comment.id}
+                className="group flex gap-3 p-2"
+                style={blotted ? undefined : { transform: `rotate(${tilt}deg)` }}
+              >
+                <WaxSeal name={comment.authorName} role={comment.authorRole} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <span className="font-mono text-xs font-bold text-foreground">
+                      {comment.authorName}
+                    </span>
+                    {comment.authorRole === "visitor" && (
+                      <span className="text-[10px] font-mono text-muted-foreground">
+                        ˚{t("role.visitor")}˚
+                      </span>
+                    )}
+                    <span className="font-mono text-[10px] text-muted-foreground">
+                      {ageLabel(comment.createdAt)}
+                    </span>
+                  </div>
+                  {blotted ? (
+                    <p className="font-serif text-sm gloss-blotted text-muted-foreground select-none">
+                      {t("marginalia.blotted")}
+                    </p>
+                  ) : (
+                    <p className={`font-serif text-sm leading-relaxed ${inkClass(ink)}`}>
+                      {comment.body}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-start gap-1.5 shrink-0">
+                  {!blotted && (
+                    <button
+                      onClick={() => handleHuzzah(comment)}
+                      disabled={comment.huzzahedByMe}
+                      data-tip={comment.huzzahedByMe ? undefined : t("marginalia.huzzah")}
+                      className="stamp-btn bevel"
+                    >
+                      <span key={comment.huzzahCount} className="inline-flex items-center gap-1 huzzah-pop">
+                        ✦ {comment.huzzahedByMe ? toRoman(comment.huzzahCount) : t("marginalia.huzzah")}
+                        {!comment.huzzahedByMe && comment.huzzahCount > 0 && (
+                          <span className="text-gold/50">· {toRoman(comment.huzzahCount)}</span>
+                        )}
+                      </span>
+                    </button>
+                  )}
+                  {isMine && !blotted && (
+                    <button
+                      onClick={() => handleBlot(comment)}
+                      data-tip={t("marginalia.blot")}
+                      className="stamp-btn bevel"
+                    >
+                      <Eraser className="w-3 h-3" />
+                    </button>
+                  )}
+                  {isMine && blotted && (
+                    <button
+                      onClick={() => handleChisel(comment)}
+                      data-tip={t("marginalia.chisel")}
+                      className="stamp-btn bevel"
+                    >
+                      <Hammer className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+
+        <div className="flex gap-2 pt-1">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={t("marginalia.placeholder")}
+            maxLength={500}
+            rows={2}
+            className="flex-1 bg-card border border-border rounded-sm p-2 text-foreground font-serif text-sm resize-none focus:outline-none focus:border-gold/50 transition-colors"
+          />
+          <Button size="sm" onClick={handleInscribe} disabled={!text.trim() || submitting}>
+            {t("marginalia.submit")}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

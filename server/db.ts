@@ -210,6 +210,26 @@ createTableIfNotExists(`
   );
 `);
 
+createTableIfNotExists(`
+  CREATE TABLE IF NOT EXISTS transfer_comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    transfer_id INTEGER NOT NULL REFERENCES transfer_history(id),
+    author_id INTEGER NOT NULL REFERENCES users(id),
+    body TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    blotted_at INTEGER
+  );
+`);
+
+createTableIfNotExists(`
+  CREATE TABLE IF NOT EXISTS transfer_comment_huzzahs (
+    comment_id INTEGER NOT NULL REFERENCES transfer_comments(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    created_at INTEGER NOT NULL,
+    UNIQUE(comment_id, user_id)
+  );
+`);
+
 const GENESIS_MS = Date.UTC(2026, 6, 1);
 export { GENESIS_MS };
 
