@@ -193,6 +193,13 @@ createTableIfNotExists(`
   );
 `);
 
+createTableIfNotExists(`
+  CREATE TABLE IF NOT EXISTS site_stats (
+    key TEXT PRIMARY KEY NOT NULL,
+    value INTEGER NOT NULL
+  );
+`);
+
 const GENESIS_MS = Date.UTC(2026, 6, 1);
 export { GENESIS_MS };
 

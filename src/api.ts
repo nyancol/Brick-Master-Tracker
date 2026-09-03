@@ -140,6 +140,13 @@ export async function devLogin(username: string): Promise<void> {
   });
 }
 
+export async function registerVisit(): Promise<number> {
+  const res = await fetchJson<{ count: number }>("/api/visits", {
+    method: "POST",
+  });
+  return res.count;
+}
+
 export interface TransferResult {
   transferId: number;
   color: string;

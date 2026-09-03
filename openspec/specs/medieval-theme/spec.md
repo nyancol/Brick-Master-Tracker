@@ -185,8 +185,16 @@ The application SHALL include classic 1998 page furniture: a scrolling "Hear Ye!
 - **THEN** a visitor counter SHALL display as mono digits in bordered odometer cells
 
 #### Scenario: Visitor counter increments
-- **WHEN** the user loads the page
-- **THEN** the displayed count SHALL equal a large base (41,000) plus the locally persisted visit count (localStorage), incremented per visit
+- **WHEN** the page loads and the visit is registered
+- **THEN** the displayed count SHALL equal the server-persisted visit count shared across all visitors, starting from 0, with no artificial base added
+
+#### Scenario: Visitor counter deduplicates within a browser session
+- **WHEN** the page is loaded again in the same browser session (cookie present)
+- **THEN** the visit SHALL NOT be incremented and the previously recorded count SHALL be displayed
+
+#### Scenario: Visitor counter count service unavailable
+- **WHEN** the visit count cannot be fetched from the server
+- **THEN** the counter SHALL display `0000000` and SHALL NOT fall back to any locally persisted count
 
 #### Scenario: Webring footer
 - **WHEN** the footer is rendered

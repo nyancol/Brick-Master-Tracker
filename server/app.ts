@@ -217,6 +217,7 @@ const swaggerSpec = swaggerJsdoc({
     servers: [{ url: "/api" }],
     tags: [
       { name: "Health", description: "Health check endpoints" },
+      { name: "Site", description: "Site-wide counters and statistics" },
       { name: "Authentication", description: "Login, logout, and session management" },
       { name: "Bricks", description: "Current brick state and holder info" },
       { name: "Transfers", description: "Transfer history, stories, and brick transfer actions" },
@@ -285,6 +286,61 @@ function qs(param: unknown): string | undefined {
  */
 app.get("/healthz", (_req, res) => {
   res.json({ status: "ok" });
+});
+
+// POST /api/visits — register a page visit (deduplicated per browser session)
+/**
+ * @openapi
+ * /visits:
+ *   post:
+ *     tags: [Site]
+ *     summary: Register a page visit
+ *     operationId: registerVisit
+ *     description: >
+ *       Increments the shared visitor count at most once per browser session.
+ *       A session-scoped `counted` cookie marks the browser as counted; repeat
+ *       requests within the same browser session return the current count
+ *       without incrementing. No authentication required.
+ *     responses:
+ *       200:
+ *         description: Current shared visit count
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 count:
+ *                   type: integer
+ *                   description: Total registered visits across all visitors
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ */
+app.post("/visits", (req, res) => {
+  try {
+    const counted = (req.headers.cookie ?? "")
+      .split(";")
+      .some((c) => c.trim() === "counted=1");
+
+    if (!counted) {
+      db.prepare(
+        "INSERT INTO site_stats (key, value) VALUES ('visits', 1) ON CONFLICT(key) DO UPDATE SET value = value + 1",
+      ).run();
+      res.cookie("counted", "1", { httpOnly: true, sameSite: "lax" });
+    }
+
+    const row = db
+      .prepare("SELECT value FROM site_stats WHERE key = 'visits'")
+      .get() as { value: number } | undefined;
+
+    res.json({ count: row?.value ?? 0 });
+  } catch (err) {
+    console.error("POST /visits failed:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 // GET /auth/login
