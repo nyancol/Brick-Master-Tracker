@@ -227,6 +227,68 @@ a.bevel:active {
   transform: translate(1px, 1px);
 }
 
+/* ---- Win98 window chrome (brick windows + dialogs) ---- */
+@keyframes window-shake {
+  0%, 100% { transform: translateX(0); }
+  15% { transform: translateX(-4px) rotate(-0.4deg); }
+  30% { transform: translateX(4px) rotate(0.4deg); }
+  45% { transform: translateX(-3px) rotate(-0.3deg); }
+  60% { transform: translateX(3px) rotate(0.3deg); }
+  75% { transform: translateX(-2px); }
+  90% { transform: translateX(2px); }
+}
+.window-shaking {
+  animation: window-shake 0.3s ease-in-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .window-shaking {
+    animation: none;
+  }
+}
+
+.win-btn {
+  min-width: 16px;
+  height: 14px;
+  padding: 0 2px;
+  line-height: 1;
+  font-size: 9px;
+  font-family: var(--app-font-sans);
+}
+
+/* ---- Win98 group box (etched fieldset) ---- */
+.group-box {
+  border: 1px solid;
+  border-color: var(--bevel-dark, #464036) var(--bevel-light, #d4cabb)
+    var(--bevel-light, #d4cabb) var(--bevel-dark, #464036);
+  box-shadow: inset 1px 1px 0 0 var(--bevel-light, #d4cabb),
+    inset -1px -1px 0 0 var(--bevel-dark, #464036);
+}
+.group-box > legend {
+  padding: 0 6px;
+}
+
+/* ---- Win98 tooltip (pale yellow, fixed era colors) ---- */
+[data-tip] {
+  position: relative;
+}
+[data-tip]:hover::after,
+[data-tip]:focus-visible::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 4px);
+  right: 0;
+  z-index: 60;
+  white-space: nowrap;
+  padding: 1px 5px 2px;
+  background: #ffffe1;
+  color: #000;
+  border: 1px solid #000;
+  box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.35);
+  font-family: var(--app-font-sans);
+  font-size: 11px;
+  pointer-events: none;
+}
+
 /* ---- Hear Ye! marquee ---- */
 @keyframes kitsch-marquee {
   from { transform: translateX(100%); }

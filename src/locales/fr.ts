@@ -56,6 +56,23 @@ const fr = {
     play: "Jouer du luth",
     stop: "Faire taire le luth",
   },
+  sfx: {
+    enable: "Sortir l'épée du fourreau",
+    disable: "Rendre les sons au silence",
+  },
+  window: {
+    minimize: "Rien à réduire, mon seigneur",
+    maximize: "Elle remplit déjà ton écran",
+    close: "Fermer la fenêtre",
+    refuseHonor: "Impossible de fermer l'Honneur !",
+    refuseShame: "La Honte s'accroche encore à toi !",
+    brickCount: "1 brique(s)",
+    daysHeld: "détenue depuis {days} j",
+    modem: "modem 56k",
+    bestowTitle: "Décerner la Brique — {name}",
+    offloadTitle: "Refiler la Brique — {name}",
+    recipient: "Destinataire : {name}",
+  },
   login: {
     signIn: "Entrer dans le donjon",
   },

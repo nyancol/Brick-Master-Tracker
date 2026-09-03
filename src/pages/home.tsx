@@ -1,13 +1,24 @@
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useBricks, transferBrick, useTransfers, type AuthUser, type UserEntry } from "@/api";
+import {
+  useBricks,
+  transferBrick,
+  useTransfers,
+  type AuthUser,
+  type UserEntry,
+  type Transfer,
+} from "@/api";
 import { useToast } from "@/hooks/use-toast";
 import { t, getLanguage, changeLanguage } from "@/hooks/use-translation";
+import { useSfx } from "@/hooks/use-sfx";
 import { useState, useCallback } from "react";
 import TransferModal from "@/components/TransferModal";
 import ChroniclesView from "@/components/ChroniclesView";
 import ThemeToggle from "@/components/ThemeToggle";
 import LuteToggle from "@/components/kitsch/LuteToggle";
+import SfxToggle from "@/components/kitsch/SfxToggle";
+import WindowFrame from "@/components/kitsch/WindowFrame";
+import StatusBar from "@/components/kitsch/StatusBar";
 import HearYeMarquee from "@/components/kitsch/HearYeMarquee";
 import VisitorCounter from "@/components/kitsch/VisitorCounter";
 import WebringFooter from "@/components/kitsch/WebringFooter";
@@ -19,6 +30,24 @@ const LANGS = [
   { code: "fr", label: "FR" },
 ] as const;
 
+function computeDaysHeld(
+  transfers: Transfer[] | undefined,
+  color: "red" | "blue",
+): number | null {
+  const times = (transfers ?? [])
+    .filter((tr) => tr.color === color)
+    .map((tr) => new Date(tr.transferredAt).getTime())
+    .filter((n) => !Number.isNaN(n));
+  if (times.length === 0) return null;
+  const last = Math.max(...times);
+  return Math.max(0, Math.floor((Date.now() - last) / 86_400_000));
+}
+
+function daysHeldLabel(days: number | null): string {
+  if (days === null) return "—";
+  return t("window.daysHeld").replace("{days}", String(days));
+}
+
 interface Props {
   user: AuthUser;
   users: UserEntry[];
@@ -27,6 +56,7 @@ interface Props {
 export default function Home({ user, users }: Props) {
   const [, forceRender] = useState(0);
   const { toast } = useToast();
+  const { play: playSfx } = useSfx();
   const { data: bricks, loading: bricksLoading, refetch: refetchBricks } = useBricks();
   const { data: transfers } = useTransfers();
   const [pending, setPending] = useState(false);
@@ -43,6 +73,7 @@ export default function Home({ user, users }: Props) {
       setPending(true);
       try {
         await transferBrick(modal.color, modal.recipientId, description, imageIds);
+        playSfx();
         setModal(null);
         refetchBricks();
         setChroniclesKey((k) => k + 1);
@@ -87,17 +118,18 @@ export default function Home({ user, users }: Props) {
     <div className="min-h-screen w-full p-4 md:p-8 max-w-5xl mx-auto">
       <header className="text-center space-y-4 mb-10">
         <div className="flex justify-end items-center gap-4 mb-2">
-          <div className="flex items-center gap-2 text-sm text-card-foreground bg-card bevel px-3 py-1 font-mono">
+          <div className="flex items-center gap-2 text-sm text-card-foreground bg-card bevel px-3 py-0.5 font-mono leading-none">
             {user.displayName}
           </div>
           <a
             href="/api/auth/logout"
-            className="flex items-center gap-2 font-mono text-sm bg-card bevel px-3 py-1 text-card-foreground hover:bg-muted transition-colors"
+            className="flex items-center gap-2 font-mono text-sm leading-none bg-card bevel px-3 py-0.5 text-card-foreground hover:bg-muted transition-colors"
           >
             {t("logout")}
           </a>
           <ThemeToggle />
           <LuteToggle />
+          <SfxToggle />
           <div className="flex gap-1">
             {LANGS.map((lang) => {
               const active = getLanguage() === lang.code;
@@ -129,7 +161,7 @@ export default function Home({ user, users }: Props) {
             {title}
           </h1>
         </div>
-        <p className="font-mono text-card-foreground tracking-widest uppercase text-sm md:text-base">
+        <p className="font-mono tracking-widest uppercase text-sm md:text-base text-[#f5e9cf] dark:text-foreground drop-shadow-[1px_1px_0_rgba(0,0,0,0.7)]">
           {t("subtitle")}
         </p>
       </header>
@@ -148,66 +180,73 @@ export default function Home({ user, users }: Props) {
             height={128}
             className="absolute -left-8 top-6 hidden md:block"
           />
-          <div className="bevel bg-muted p-1.5">
-            <div className="bevel-in mb-1.5 flex items-center gap-2 bg-gradient-to-b from-[#8a3b34] to-[#571f1a] px-2 py-1">
-              <img src="/gifs/swords.gif" alt="" width={81} height={109} className="h-5 w-auto" />
-              <span className="font-display text-lg leading-none text-[#f3e2c8]">
-                {t("honor.name")}
-              </span>
-              <span className="ml-auto font-mono text-[10px] text-[#f3e2c8]/70">
+          <WindowFrame
+            title={t("honor.name")}
+            icon={{ src: "/gifs/swords.gif" }}
+            titleBarClassName="bg-gradient-to-b from-[#8a3b34] to-[#571f1a]"
+            titleTextClassName="text-[#f3e2c8]"
+            suffix={
+              <span className="font-mono text-[10px] text-[#f3e2c8]/70">
                 HONOR.EXE
               </span>
+            }
+            refuseToastTitle={t("window.refuseHonor")}
+            statusBar={
+              <StatusBar
+                left={t("window.brickCount")}
+                right={`${daysHeldLabel(computeDaysHeld(transfers, "red"))} · ${t("window.modem")}`}
+              />
+            }
+            contentClassName="flex flex-col items-center text-center space-y-5 p-6"
+          >
+            <div className="bevel-in bg-muted p-4">
+              <img
+                src="/red-brick.png"
+                alt="Red Lego Brick"
+                className="w-24 h-24 object-contain drop-shadow-[0_4px_16px_rgba(220,38,38,0.3)]"
+              />
             </div>
-            <div className="bevel-in bg-card p-6 flex flex-col items-center text-center space-y-5">
-              <div className="bevel-in bg-muted p-4">
-                <img
-                  src="/red-brick.png"
-                  alt="Red Lego Brick"
-                  className="w-24 h-24 object-contain drop-shadow-[0_4px_16px_rgba(220,38,38,0.3)]"
-                />
-              </div>
-              <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-                {t("honor.heldBy")}
-              </p>
-              <div className="bevel-in w-full bg-[#101010] px-4 py-2 text-2xl font-bold text-[#ffd76e]">
-                {redBrick?.holderName || "—"}
-              </div>
-              <div className="w-full space-y-3 border-t-2 border-honor/30 pt-4">
-                {isRedHolder ? (
-                  <>
-                    <p className="text-xs font-mono uppercase text-honor/80 tracking-widest">
-                      {t("honor.transferTo")}
-                    </p>
-                    <div className="flex gap-3 justify-center flex-wrap">
-                      {users
-                        .filter((u) => u.id !== user.id)
-                        .map((friend) => (
-                          <Button
-                            key={friend.id}
-                            variant="outline"
-                            className="flex-1 bg-card text-honor hover:bg-honor hover:text-primary-foreground"
-                            onClick={() =>
-                              setModal({
-                                color: "red",
-                                recipientId: friend.id,
-                                recipientName: friend.username,
-                              })
-                            }
-                            disabled={pending}
-                          >
-                            {friend.username}
-                          </Button>
-                        ))}
-                    </div>
-                  </>
-                ) : (
-                  <p className="text-sm font-mono text-honor/70 uppercase tracking-widest">
-                    {t("honor.waitingForTransfer").replace("{name}", redBrick?.holderName || "someone")}
-                  </p>
-                )}
-              </div>
+            <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+              {t("honor.heldBy")}
+            </p>
+            <div className="bevel-in w-full bg-[#101010] px-4 py-2 text-2xl font-bold text-[#ffd76e]">
+              {redBrick?.holderName || "—"}
             </div>
-          </div>
+            <div className="w-full space-y-3 border-t-2 border-honor/30 pt-4">
+              {isRedHolder ? (
+                <fieldset className="group-box w-full px-3 pb-3 pt-1.5">
+                  <legend className="font-mono text-xs uppercase tracking-widest text-honor/80">
+                    {t("honor.transferTo")}
+                  </legend>
+                  <div className="flex gap-3 justify-center flex-wrap pt-1">
+                    {users
+                      .filter((u) => u.id !== user.id)
+                      .map((friend) => (
+                        <Button
+                          key={friend.id}
+                          variant="outline"
+                          className="flex-1 bg-card text-honor hover:bg-honor hover:text-primary-foreground"
+                          onClick={() =>
+                            setModal({
+                              color: "red",
+                              recipientId: friend.id,
+                              recipientName: friend.username,
+                            })
+                          }
+                          disabled={pending}
+                        >
+                          {friend.username}
+                        </Button>
+                      ))}
+                  </div>
+                </fieldset>
+              ) : (
+                <p className="text-sm font-mono text-honor/70 uppercase tracking-widest">
+                  {t("honor.waitingForTransfer").replace("{name}", redBrick?.holderName || "someone")}
+                </p>
+              )}
+            </div>
+          </WindowFrame>
         </div>
 
         {/* Blue Brick — Shame */}
@@ -219,66 +258,73 @@ export default function Home({ user, users }: Props) {
             height={128}
             className="absolute -right-8 top-6 hidden md:block"
           />
-          <div className="bevel bg-muted p-1.5">
-            <div className="bevel-in mb-1.5 flex items-center gap-2 bg-gradient-to-b from-[#2f3567] to-[#141838] px-2 py-1">
-              <img src="/gifs/skull.gif" alt="" width={100} height={100} className="h-5 w-auto" />
-              <span className="font-display text-lg leading-none text-[#d6dcff]">
-                {t("shame.name")}
-              </span>
-              <span className="ml-auto font-mono text-[10px] text-[#d6dcff]/70">
+          <WindowFrame
+            title={t("shame.name")}
+            icon={{ src: "/gifs/skull.gif" }}
+            titleBarClassName="bg-gradient-to-b from-[#2f3567] to-[#141838]"
+            titleTextClassName="text-[#d6dcff]"
+            suffix={
+              <span className="font-mono text-[10px] text-[#d6dcff]/70">
                 SHAME.EXE
               </span>
+            }
+            refuseToastTitle={t("window.refuseShame")}
+            statusBar={
+              <StatusBar
+                left={t("window.brickCount")}
+                right={`${daysHeldLabel(computeDaysHeld(transfers, "blue"))} · ${t("window.modem")}`}
+              />
+            }
+            contentClassName="flex flex-col items-center text-center space-y-5 p-6"
+          >
+            <div className="bevel-in bg-muted p-4">
+              <img
+                src="/blue-brick.png"
+                alt="Blue Lego Brick"
+                className="w-24 h-24 object-contain drop-shadow-[0_4px_16px_rgba(6,182,212,0.3)]"
+              />
             </div>
-            <div className="bevel-in bg-card p-6 flex flex-col items-center text-center space-y-5">
-              <div className="bevel-in bg-muted p-4">
-                <img
-                  src="/blue-brick.png"
-                  alt="Blue Lego Brick"
-                  className="w-24 h-24 object-contain drop-shadow-[0_4px_16px_rgba(6,182,212,0.3)]"
-                />
-              </div>
-              <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-                {t("shame.cursedUpon")}
-              </p>
-              <div className="bevel-in w-full bg-[#101010] px-4 py-2 text-2xl font-bold text-[#8fb6ff]">
-                {blueBrick?.holderName || "—"}
-              </div>
-              <div className="w-full space-y-3 border-t-2 border-shame/30 pt-4">
-                {isBlueHolder ? (
-                  <>
-                    <p className="text-xs font-mono uppercase text-shame/80 tracking-widest">
-                      {t("shame.offloadTo")}
-                    </p>
-                    <div className="flex gap-3 justify-center flex-wrap">
-                      {users
-                        .filter((u) => u.id !== user.id)
-                        .map((friend) => (
-                          <Button
-                            key={friend.id}
-                            variant="outline"
-                            className="flex-1 bg-card text-shame hover:bg-shame hover:text-primary-foreground"
-                            onClick={() =>
-                              setModal({
-                                color: "blue",
-                                recipientId: friend.id,
-                                recipientName: friend.username,
-                              })
-                            }
-                            disabled={pending}
-                          >
-                            {friend.username}
-                          </Button>
-                        ))}
-                    </div>
-                  </>
-                ) : (
-                  <p className="text-sm font-mono text-shame/70 uppercase tracking-widest">
-                    {t("shame.waitingForTransfer").replace("{name}", blueBrick?.holderName || "someone")}
-                  </p>
-                )}
-              </div>
+            <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+              {t("shame.cursedUpon")}
+            </p>
+            <div className="bevel-in w-full bg-[#101010] px-4 py-2 text-2xl font-bold text-[#8fb6ff]">
+              {blueBrick?.holderName || "—"}
             </div>
-          </div>
+            <div className="w-full space-y-3 border-t-2 border-shame/30 pt-4">
+              {isBlueHolder ? (
+                <fieldset className="group-box w-full px-3 pb-3 pt-1.5">
+                  <legend className="font-mono text-xs uppercase tracking-widest text-shame/80">
+                    {t("shame.offloadTo")}
+                  </legend>
+                  <div className="flex gap-3 justify-center flex-wrap pt-1">
+                    {users
+                      .filter((u) => u.id !== user.id)
+                      .map((friend) => (
+                        <Button
+                          key={friend.id}
+                          variant="outline"
+                          className="flex-1 bg-card text-shame hover:bg-shame hover:text-primary-foreground"
+                          onClick={() =>
+                            setModal({
+                              color: "blue",
+                              recipientId: friend.id,
+                              recipientName: friend.username,
+                            })
+                          }
+                          disabled={pending}
+                        >
+                          {friend.username}
+                        </Button>
+                      ))}
+                  </div>
+                </fieldset>
+              ) : (
+                <p className="text-sm font-mono text-shame/70 uppercase tracking-widest">
+                  {t("shame.waitingForTransfer").replace("{name}", blueBrick?.holderName || "someone")}
+                </p>
+              )}
+            </div>
+          </WindowFrame>
         </div>
       </div>
 

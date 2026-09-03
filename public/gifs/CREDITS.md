@@ -24,3 +24,4 @@ Generated locally (not hunted):
 ## Audio
 
 - `../audio/lute.mp3` — "Greensleeves (Piano, seamless loop)" by Oursvince, CC BY-SA 3.0. Source: https://archive.org/details/jamendo-163754 (re-encoded to 64kbps mono). Distributed under CC BY-SA 3.0; attribution to the original artist is included here.
+- `../audio/sword-shing.wav` — sword-draw "shing" sound effect. Generated locally (not hunted): synthesized procedurally from inharmonic metallic partials over a noise-scrape transient (22050 Hz mono 16-bit WAV). No third-party rights.

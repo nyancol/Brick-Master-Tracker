@@ -39,7 +39,7 @@ export default function Login() {
             {t("title")}
           </h1>
         </div>
-        <p className="font-mono text-card-foreground tracking-widest uppercase text-sm">
+        <p className="font-mono tracking-widest uppercase text-sm text-[#f5e9cf] dark:text-foreground drop-shadow-[1px_1px_0_rgba(0,0,0,0.7)]">
           {t("subtitle")}
         </p>
       </div>

@@ -2,6 +2,8 @@ import { useState, useRef, useCallback } from "react";
 import { X, Scroll, Check, ShieldAlert, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Ornament } from "@/components/ui/ornament";
+import WindowFrame from "@/components/kitsch/WindowFrame";
+import StatusBar from "@/components/kitsch/StatusBar";
 import { t } from "@/hooks/use-translation";
 import { uploadStagingImage, deleteStagingImage, type StagingImage, type BrickColor } from "@/api";
 
@@ -105,23 +107,33 @@ export default function TransferModal({ color, recipientName, onConfirm, onCance
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
-      <div className="relative w-full max-w-lg bg-card bevel border-2 border-gold/50 p-6 space-y-6 shadow-2xl animate-seal-stamp">
-        <Ornament position="top-left" size="sm" />
-        <Ornament position="top-right" size="sm" />
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-display text-gold">
-            {color === "red" ? t("honor.transferTo") : t("shame.offloadTo")} {recipientName}
-          </h2>
-          <button
-            onClick={onCancel}
-            className="bevel bg-card text-card-foreground px-1.5 py-0.5 text-xs font-mono"
-            aria-label="Close"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="space-y-2">
+      <div className="w-full max-w-lg animate-seal-stamp">
+        <WindowFrame
+          title={
+            color === "red"
+              ? t("window.bestowTitle").replace("{name}", recipientName)
+              : t("window.offloadTitle").replace("{name}", recipientName)
+          }
+          icon={{ src: color === "red" ? "/gifs/swords.gif" : "/gifs/skull.gif" }}
+          titleBarClassName={
+            color === "red"
+              ? "bg-gradient-to-b from-[#8a3b34] to-[#571f1a]"
+              : "bg-gradient-to-b from-[#2f3567] to-[#141838]"
+          }
+          titleTextClassName={color === "red" ? "text-[#f3e2c8]" : "text-[#d6dcff]"}
+          onClose={onCancel}
+          statusBar={
+            <StatusBar
+              left={t("window.recipient").replace("{name}", recipientName)}
+              right={t("window.modem")}
+            />
+          }
+          className="border-2 border-gold/50 shadow-2xl"
+          contentClassName="relative p-6 space-y-6"
+        >
+          <Ornament position="top-left" size="sm" />
+          <Ornament position="top-right" size="sm" />
+          <div className="space-y-2">
           <label className="block text-sm font-mono uppercase text-muted-foreground tracking-wider">
             {t("modal.descriptionLabel")}
           </label>
@@ -201,6 +213,7 @@ export default function TransferModal({ color, recipientName, onConfirm, onCance
             {t("modal.confirm")}
           </Button>
         </div>
+        </WindowFrame>
       </div>
     </div>
   );

@@ -56,6 +56,23 @@ const en = {
     play: "Play the lute",
     stop: "Silence the lute",
   },
+  sfx: {
+    enable: "Unsheathe the sounds",
+    disable: "Silence the sounds",
+  },
+  window: {
+    minimize: "Nothing to minimize, my liege",
+    maximize: "It already filleth thy screen",
+    close: "Close window",
+    refuseHonor: "Thou canst not close the Honor!",
+    refuseShame: "The Shame clingeth to thee still!",
+    brickCount: "1 brick(s)",
+    daysHeld: "{days} days held",
+    modem: "56k modem",
+    bestowTitle: "Bestow the Brick — {name}",
+    offloadTitle: "Offload the Brick — {name}",
+    recipient: "Recipient: {name}",
+  },
   login: {
     signIn: "Enter þe Keep",
   },

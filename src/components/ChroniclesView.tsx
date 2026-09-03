@@ -48,7 +48,7 @@ export default function ChroniclesView({ currentUser }: Props) {
             height={90}
             className="-my-4"
           />
-          <h3 className="text-3xl font-display text-gold">
+          <h3 className="heading-kitsch text-3xl font-display text-gold">
             {t("chronicles.title")}
           </h3>
         </div>
@@ -80,7 +80,7 @@ export default function ChroniclesView({ currentUser }: Props) {
           height={90}
           className="-my-4"
         />
-        <h3 className="text-3xl font-display text-gold">
+        <h3 className="heading-kitsch text-3xl font-display text-gold">
           {t("chronicles.title")}
         </h3>
       </div>
@@ -90,7 +90,7 @@ export default function ChroniclesView({ currentUser }: Props) {
           <div key={year}>
             <div className="flex items-center gap-3 mb-6">
               <div className="h-px flex-1 bg-gradient-to-r from-gold/50 to-gold/10" />
-              <h4 className="font-mono text-sm text-gold/80 uppercase tracking-[0.3em]">
+              <h4 className="font-mono text-sm uppercase tracking-[0.3em] text-[#efe4c8] dark:text-gold/80 drop-shadow-[1px_1px_0_rgba(0,0,0,0.7)]">
                 ANNO DOMINI {toRoman(year)}
               </h4>
               <div className="h-px flex-1 bg-gradient-to-r from-gold/10 to-gold/50" />
