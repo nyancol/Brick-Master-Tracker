@@ -337,7 +337,7 @@ export default function Home({ user, users }: Props) {
                 </p>
               )}
             </div>
-            <TenureLedger tenure={redTenure} users={users} accentClass="text-honor/80" />
+            <TenureLedger tenure={redTenure} users={users} accentClass="text-honor" />
           </WindowFrame>
         </div>
 
@@ -430,7 +430,7 @@ export default function Home({ user, users }: Props) {
                 </p>
               )}
             </div>
-            <TenureLedger tenure={blueTenure} users={users} accentClass="text-shame/80" />
+            <TenureLedger tenure={blueTenure} users={users} accentClass="text-shame" />
           </WindowFrame>
         </div>
       </div>

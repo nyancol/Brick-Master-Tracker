@@ -265,6 +265,7 @@ a.bevel:active {
 }
 .group-box > legend {
   padding: 0 6px;
+  background-color: hsl(var(--card));
 }
 
 /* ---- Win98 tooltip (pale yellow, fixed era colors) ---- */
