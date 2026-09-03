@@ -24,3 +24,4 @@ brick-tracker-data/
 # misc
 .DS_Store
 Thumbs.db
+.firecrawl/

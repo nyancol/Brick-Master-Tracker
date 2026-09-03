@@ -1,20 +1,41 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+# Project context — shown to AI when creating artifacts (proposal/design/specs/tasks).
+context: |
+  Tech stack: React + Vite + Tailwind v4 + shadcn-style UI (src/), Express + SQLite server (server/),
+  single npm build (tsc --noEmit && vite build && node build-server.mjs; scripts: typecheck, build, dev, start).
+  i18n: en + fr dictionaries in src/locales — every user-facing string MUST exist in both.
+  Themes: Day (light, castle stone) and Dungeon (dark, starfield) via `.dark` class + CSS vars; both must always work.
+  Motion/audio must respect prefers-reduced-motion and autoplay policies (sound only after user gesture).
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+  UX TESTING CONVENTIONS — apply when planning/verifying any UI or UX change:
+  1. Never touch the real data. Run the built server with env overrides:
+     PORT=3199 DATA_PATH=/tmp/opencode/bmt-data DB_PATH=/tmp/opencode/bmt-data/brick.db IMAGE_PATH=/tmp/opencode/bmt-data/upload node dist/server.mjs
+     (bare `npm start` fails: the server mkdirs /app/data, a Docker path).
+  2. Auth: dev test-user login is enabled by default.
+     POST /api/auth/dev/login {"username":"yann"|"anselme"|"thomas"} → capture connect.sid cookie → addCookies in browser.
+  3. Browser automation: playwright-core is NOT a repo dependency — install a scratch copy under /tmp/opencode
+     (npm i playwright-core). Stock Firefox ESR will NOT work (no juggler); use `npx playwright-core install firefox`
+     for the patched build (cached in ~/.cache/ms-playwright).
+  4. SPA timing: screenshots need waitUntil:"networkidle" + waitForSelector on a landmark. Plain
+     `firefox --headless --screenshot` races hydration (captures the loading spinner) — not acceptable evidence.
+     Wait out entry animations before capturing (e.g. seal-stamp runs 0.5s).
+  5. Techniques that work here:
+     - CSS animations: locator('.class') + getComputedStyle(el).animationName
+     - Audio wiring (no ears needed): page.addInitScript stubbing HTMLMediaElement.prototype.play to count calls
+       and record currentSrc — asserts a trigger plays the right file once; not acoustic quality.
+     - LocalStorage prefs: addInitScript(() => localStorage.setItem("lang","fr")) or in-page evaluate for theme.
+     - Reduced motion: newContext({ reducedMotion: "reduce" }).
+     - Eyeball PNGs with the Read tool — pixel truth is the final arbiter for design changes.
+  6. Verification matrix for any new visible/moving/audible element: light + dark, en + fr,
+     normal motion + prefers-reduced-motion, plus before/after full-page screenshots.
+  7. Keep harness scripts in /tmp scratch (do not commit) unless asked; kill test servers when done.
+
+# Per-artifact rules
+rules:
+  design:
+    - UI/UX changes must include a "Verification plan" section: the theme/locale/motion matrix coverage and which interactions get automated checks vs screenshots.
+  tasks:
+    - Every UI change ends with a Verification group that applies the UX Testing Conventions from context (isolated test server, dev-login, playwright-core harness, reduced-motion + locale matrix, screenshots eyeballed via Read).
+  proposal:
+    - For UI changes, state explicitly which visual surfaces are out of scope so design expectations stay aligned.
