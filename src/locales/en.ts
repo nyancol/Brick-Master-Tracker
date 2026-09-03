@@ -39,6 +39,19 @@ const en = {
   loading: "Summoning þe bricks...",
   transferFailed: "Transfer failed",
   logout: "Flee þe Keep",
+  role: {
+    knight: "Knight",
+    visitor: "Visitor",
+  },
+  visitor: {
+    banner:
+      "Visitors behold from þe ramparts — only þe Knights of Friendship carry þe brick.",
+  },
+  transfer: {
+    onlyKnights: "Only Knights of Friendship can transfer the brick.",
+    recipientNotKnight:
+      "That soul is not a participant — only Knights of Friendship can hold the brick.",
+  },
   marquee: {
     template: "Hear Ye! Hear Ye! {brick} hath passed from {from} unto {to}!",
     forged: "Hear Ye! Hear Ye! The {brick} was forged unto {to}!",

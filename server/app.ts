@@ -81,6 +81,10 @@ const upload = multer({
  *           type: string
  *         username:
  *           type: string
+ *         role:
+ *           type: string
+ *           enum: [knight, visitor]
+ *           description: Participation role derived from OIDC group membership
  *         avatarUrl:
  *           type: string
  *           nullable: true
@@ -559,6 +563,9 @@ app.get("/auth/me", (req, res) => {
  *                         type: string
  *                       displayName:
  *                         type: string
+ *                       role:
+ *                         type: string
+ *                         enum: [knight, visitor]
  */
 app.get("/auth/dev", (_req, res) => {
   if (isDevLoginEnabled()) {
@@ -627,6 +634,7 @@ app.post("/auth/dev/login", (req, res) => {
     devUser.displayName,
     devUser.username,
     devUser.avatarUrl,
+    devUser.role,
   );
   req.session.user = { id: user.id, email: user.email };
   req.session.save((err) => {
@@ -991,7 +999,7 @@ app.put("/transfers/:id/story", requireAuth, (req, res) => {
  *             schema:
  *               $ref: "#/components/schemas/Error"
  *       403:
- *         description: Only the current holder can transfer
+ *         description: Only knights who are the current holder can transfer
  *         content:
  *           application/json:
  *             schema:
@@ -1018,6 +1026,15 @@ app.post("/bricks/:color/transfer", requireAuth, (req, res) => {
 
   const picIds: number[] = Array.isArray(imageIds) ? imageIds : [];
   const currentUserId = req.session.user!.id;
+
+  const currentUser = db
+    .prepare("SELECT role FROM users WHERE id = ?")
+    .get(currentUserId) as { role: string } | undefined;
+
+  if (!currentUser || currentUser.role !== "knight") {
+    res.status(403).json({ error: "Only knights can transfer this brick" });
+    return;
+  }
 
   type TxResult =
     | { error: string; status: 404 | 400 | 403 }
@@ -1052,13 +1069,20 @@ app.post("/bricks/:color/transfer", requireAuth, (req, res) => {
       }
 
       const recipient = db
-        .prepare("SELECT id, username, avatar_url FROM users WHERE id = ?")
+        .prepare("SELECT id, username, avatar_url, role FROM users WHERE id = ?")
         .get(to) as
-        | { id: number; username: string; avatar_url: string | null }
+        | { id: number; username: string; avatar_url: string | null; role: string }
         | undefined;
 
       if (!recipient) {
         return { error: "Invalid recipient", status: 400 };
+      }
+
+      if (recipient.role !== "knight") {
+        return {
+          error: "Recipient is not a participant — only knights can hold the brick",
+          status: 400,
+        };
       }
 
       const now = Date.now();

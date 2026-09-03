@@ -39,6 +39,19 @@ const fr = {
   loading: "Invocation des briques...",
   transferFailed: "Échec du transfert",
   logout: "Fuir le donjon",
+  role: {
+    knight: "Chevalier",
+    visitor: "Visiteur",
+  },
+  visitor: {
+    banner:
+      "Les Visiteurs regardent, les Chevaliers de l'Amitié portent la brique.",
+  },
+  transfer: {
+    onlyKnights: "Seuls les Chevaliers de l'Amitié peuvent transférer la brique.",
+    recipientNotKnight:
+      "Cette âme n'est pas un participant — seuls les Chevaliers de l'Amitié peuvent porter la brique.",
+  },
   marquee: {
     template: "Oyez ! Oyez ! {brick} est passée de {from} à {to} !",
     forged: "Oyez ! Oyez ! La {brick} fut forgée et remise à {to} !",

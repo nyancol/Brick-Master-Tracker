@@ -11,6 +11,8 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
 
 export type BrickColor = "red" | "blue";
 
+export type UserRole = "knight" | "visitor";
+
 export interface BrickState {
   color: BrickColor;
   holderId: number | null;
@@ -60,6 +62,7 @@ export interface AuthUser {
   displayName: string;
   username: string;
   avatarUrl: string | null;
+  role: UserRole;
 }
 
 export interface UserEntry {
@@ -67,6 +70,7 @@ export interface UserEntry {
   displayName: string;
   username: string;
   avatarUrl: string | null;
+  role: UserRole;
 }
 
 interface AuthMeResponse {
@@ -77,6 +81,7 @@ interface AuthMeResponse {
 export interface DevUserEntry {
   username: string;
   displayName: string;
+  role: UserRole;
 }
 
 export interface DevLoginInfo {

@@ -2,7 +2,7 @@ import * as client from "openid-client";
 import type { Configuration, TokenEndpointResponseHelpers } from "openid-client";
 import { randomBytes } from "node:crypto";
 import db, { ensureGenesisRow } from "./db.js";
-import type { User, SessionUser } from "../shared/types.js";
+import type { User, SessionUser, UserRole } from "../shared/types.js";
 
 let oidcConfig: Configuration | null = null;
 let discoveryError: string | null = null;
@@ -10,6 +10,16 @@ let discoveryError: string | null = null;
 const issuerUrl = process.env.OIDC_ISSUER;
 const clientId = process.env.OIDC_CLIENT_ID;
 const clientSecret = process.env.OIDC_CLIENT_SECRET;
+
+// OIDC group names used to derive user roles. Must match the group names in
+// the provider exactly (accents included). Unrecognized/missing groups → visitor.
+const KNIGHT_GROUP = process.env.OIDC_GROUP_KNIGHTS ?? "Les Chevaliers de l'Amitié";
+const VISITOR_GROUP = process.env.OIDC_GROUP_VISITORS ?? "Les Visiteurs";
+
+export function deriveRoleFromGroups(groups: string[]): UserRole {
+  if (groups.includes(KNIGHT_GROUP)) return "knight";
+  return "visitor";
+}
 
 export function getOidcConfig(): Configuration | null {
   return oidcConfig;
@@ -61,7 +71,7 @@ export async function generateAuthUrl(): Promise<string> {
   const codeChallenge = await client.calculatePKCECodeChallenge(codeVerifier);
 
   const params: Record<string, string> = {
-    scope: "openid profile email",
+    scope: "openid profile email groups",
     state,
     nonce,
     code_challenge: codeChallenge,
@@ -127,7 +137,20 @@ export async function handleCallback(
     username = name.toLowerCase().replace(/\s+/g, "-");
   }
 
-  const user = upsertUser(sub, email, name, username, picture);
+  const rawGroups = (claims as { groups?: unknown }).groups;
+  const groups = Array.isArray(rawGroups)
+    ? rawGroups.filter((g): g is string => typeof g === "string")
+    : [];
+  const role = deriveRoleFromGroups(groups);
+  if (role === "visitor" && !groups.includes(VISITOR_GROUP)) {
+    console.warn(
+      `No recognized OIDC group for user ${email} (${sub}) — defaulting to visitor. Raw groups claim: ${
+        groups.length ? JSON.stringify(groups) : "<missing or empty>"
+      }`,
+    );
+  }
+
+  const user = upsertUser(sub, email, name, username, picture, role);
   maybeBootstrapBricks(user);
 
   return { id: user.id, email: user.email };
@@ -139,6 +162,7 @@ export function upsertUser(
   displayName: string,
   username: string,
   avatarUrl: string | null,
+  role: UserRole,
 ): User {
   const existing = db
     .prepare("SELECT id, email, display_name, username, avatar_url FROM users WHERE sub = ?")
@@ -148,14 +172,15 @@ export function upsertUser(
 
   if (existing) {
     db.prepare(
-      "UPDATE users SET email = ?, display_name = ?, username = ?, avatar_url = ? WHERE id = ?",
-    ).run(email, displayName, username, avatarUrl, existing.id);
+      "UPDATE users SET email = ?, display_name = ?, username = ?, avatar_url = ?, role = ? WHERE id = ?",
+    ).run(email, displayName, username, avatarUrl, role, existing.id);
     return {
       id: existing.id,
       sub,
       email,
       displayName,
       username,
+      role,
       avatarUrl,
       createdAt: 0,
     };
@@ -164,9 +189,9 @@ export function upsertUser(
   const now = Date.now();
   const result = db
     .prepare(
-      "INSERT INTO users (sub, email, display_name, username, avatar_url, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+      "INSERT INTO users (sub, email, display_name, username, avatar_url, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
-    .run(sub, email, displayName, username, avatarUrl, now);
+    .run(sub, email, displayName, username, avatarUrl, role, now);
 
   return {
     id: Number(result.lastInsertRowid),
@@ -174,6 +199,7 @@ export function upsertUser(
     email,
     displayName,
     username,
+    role,
     avatarUrl,
     createdAt: now,
   };
@@ -226,12 +252,14 @@ export interface DevTestUser {
   displayName: string;
   username: string;
   avatarUrl: string | null;
+  role: UserRole;
 }
 
 export const DEV_TEST_USERS: DevTestUser[] = [
-  { sub: "dev:yann", email: "yann@example.com", displayName: "Yann", username: "yann", avatarUrl: null },
-  { sub: "dev:anselme", email: "anselme@example.com", displayName: "Anselme", username: "anselme", avatarUrl: null },
-  { sub: "dev:thomas", email: "thomas@example.com", displayName: "Thomas", username: "thomas", avatarUrl: null },
+  { sub: "dev:yann", email: "yann@example.com", displayName: "Yann", username: "yann", avatarUrl: null, role: "knight" },
+  { sub: "dev:anselme", email: "anselme@example.com", displayName: "Anselme", username: "anselme", avatarUrl: null, role: "knight" },
+  { sub: "dev:thomas", email: "thomas@example.com", displayName: "Thomas", username: "thomas", avatarUrl: null, role: "knight" },
+  { sub: "dev:salma", email: "salma@example.com", displayName: "Salma", username: "salma", avatarUrl: null, role: "visitor" },
 ];
 
 export function isDevLoginEnabled(): boolean {
@@ -241,7 +269,7 @@ export function isDevLoginEnabled(): boolean {
 
 export function seedDevUsers(): void {
   for (const user of DEV_TEST_USERS) {
-    upsertUser(user.sub, user.email, user.displayName, user.username, user.avatarUrl);
+    upsertUser(user.sub, user.email, user.displayName, user.username, user.avatarUrl, user.role);
   }
   console.log(`Seeded ${DEV_TEST_USERS.length} dev test users`);
 }
@@ -273,8 +301,8 @@ export function bootstrapDevBricks(): void {
   }
 }
 
-export function getDevTestUsers(): Array<{ username: string; displayName: string }> {
-  return DEV_TEST_USERS.map((u) => ({ username: u.username, displayName: u.displayName }));
+export function getDevTestUsers(): Array<{ username: string; displayName: string; role: UserRole }> {
+  return DEV_TEST_USERS.map((u) => ({ username: u.username, displayName: u.displayName, role: u.role }));
 }
 
 export function findDevTestUser(username: string): DevTestUser | undefined {
@@ -288,15 +316,22 @@ export interface AuthMeResponse {
     displayName: string;
     username: string;
     avatarUrl: string | null;
+    role: UserRole;
   };
-  users: Array<{ id: number; displayName: string; username: string; avatarUrl: string | null }>;
+  users: Array<{
+    id: number;
+    displayName: string;
+    username: string;
+    avatarUrl: string | null;
+    role: UserRole;
+  }>;
 }
 
 export function getAuthMe(userId: number): AuthMeResponse {
   const currentUser = db
-    .prepare("SELECT id, email, display_name, username, avatar_url FROM users WHERE id = ?")
+    .prepare("SELECT id, email, display_name, username, avatar_url, role FROM users WHERE id = ?")
     .get(userId) as
-    | { id: number; email: string; display_name: string; username: string; avatar_url: string | null }
+    | { id: number; email: string; display_name: string; username: string; avatar_url: string | null; role: UserRole }
     | undefined;
 
   if (!currentUser) {
@@ -304,12 +339,13 @@ export function getAuthMe(userId: number): AuthMeResponse {
   }
 
   const allUsers = db
-    .prepare("SELECT id, display_name, username, avatar_url FROM users ORDER BY display_name")
+    .prepare("SELECT id, display_name, username, avatar_url, role FROM users ORDER BY display_name")
     .all() as Array<{
     id: number;
     display_name: string;
     username: string;
     avatar_url: string | null;
+    role: UserRole;
   }>;
 
   return {
@@ -319,12 +355,14 @@ export function getAuthMe(userId: number): AuthMeResponse {
       displayName: currentUser.display_name,
       username: currentUser.username,
       avatarUrl: currentUser.avatar_url,
+      role: currentUser.role,
     },
     users: allUsers.map((u) => ({
       id: u.id,
       displayName: u.display_name,
       username: u.username,
       avatarUrl: u.avatar_url,
+      role: u.role,
     })),
   };
 }

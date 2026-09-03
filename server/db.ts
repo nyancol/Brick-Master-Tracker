@@ -20,6 +20,7 @@ sqlite.exec(`
     email TEXT NOT NULL,
     display_name TEXT NOT NULL,
     username TEXT NOT NULL DEFAULT '',
+    role TEXT NOT NULL DEFAULT 'knight' CHECK (role IN ('knight','visitor')),
     avatar_url TEXT,
     created_at INTEGER NOT NULL
   );
@@ -35,6 +36,15 @@ sqlite.exec(`
 if (!columnExists("users", "username")) {
   sqlite.exec("ALTER TABLE users ADD COLUMN username TEXT NOT NULL DEFAULT ''");
   console.log("Added username column to users table");
+}
+
+// Add role column if it doesn't exist (migration for existing databases).
+// Existing users backfill as 'knight' so current participants keep participating.
+if (!columnExists("users", "role")) {
+  sqlite.exec(
+    "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'knight' CHECK (role IN ('knight','visitor'))",
+  );
+  console.log("Added role column to users table (backfilled existing users as knight)");
 }
 
 // Check if old TEXT column schema exists and migrate

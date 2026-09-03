@@ -1,9 +1,12 @@
+export type UserRole = "knight" | "visitor";
+
 export interface User {
   id: number;
   sub: string;
   email: string;
   displayName: string;
   username: string;
+  role: UserRole;
   avatarUrl: string | null;
   createdAt: number;
 }

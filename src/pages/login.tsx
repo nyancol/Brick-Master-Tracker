@@ -72,6 +72,9 @@ export default function Login() {
                 className="bevel bg-card text-card-foreground px-6 py-3 text-sm font-bold uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {user.displayName}
+                <span className="ml-2 text-[10px] font-mono tracking-widest text-gold">
+                  {t(user.role === "knight" ? "role.knight" : "role.visitor")}
+                </span>
               </button>
             ))}
           </div>

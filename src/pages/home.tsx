@@ -41,6 +41,12 @@ interface LedgerRow {
 
 function buildLedgerRows(tenure: TenureData, users: UserEntry[]): LedgerRow[] {
   return users
+    .filter(
+      (u) =>
+        u.role === "knight" ||
+        tenure.totalsMs.has(u.id) ||
+        tenure.currentHolderId === u.id,
+    )
     .map((u) => ({
       userId: u.id,
       username: u.username,
@@ -128,9 +134,16 @@ export default function Home({ user, users }: Props) {
         refetchBricks();
         setChroniclesKey((k) => k + 1);
       } catch (err) {
+        const raw = err instanceof Error ? err.message : String(err);
+        const description =
+          raw === "Only knights can transfer this brick"
+            ? t("transfer.onlyKnights")
+            : raw === "Recipient is not a participant — only knights can hold the brick"
+              ? t("transfer.recipientNotKnight")
+              : raw;
         toast({
           title: t("transferFailed"),
-          description: err instanceof Error ? err.message : String(err),
+          description,
           variant: "destructive",
         });
       } finally {
@@ -151,8 +164,8 @@ export default function Home({ user, users }: Props) {
   const redTenure = useMemo(() => computeTenures(transfers, "red"), [transfers]);
   const blueTenure = useMemo(() => computeTenures(transfers, "blue"), [transfers]);
 
-  const isRedHolder = redBrick?.holderId === user.id;
-  const isBlueHolder = blueBrick?.holderId === user.id;
+  const isRedHolder = redBrick?.holderId === user.id && user.role === "knight";
+  const isBlueHolder = blueBrick?.holderId === user.id && user.role === "knight";
 
   if (bricksLoading) {
     return (
@@ -173,6 +186,9 @@ export default function Home({ user, users }: Props) {
         <div className="flex justify-end items-center gap-4 mb-2">
           <div className="flex items-center gap-2 text-sm text-card-foreground bg-card bevel px-3 py-0.5 font-mono leading-none">
             {user.displayName}
+            <span className="text-[10px] uppercase tracking-widest text-gold">
+              {t(user.role === "knight" ? "role.knight" : "role.visitor")}
+            </span>
           </div>
           <a
             href="/api/auth/logout"
@@ -222,6 +238,14 @@ export default function Home({ user, users }: Props) {
       <div className="mb-11">
         <HearYeMarquee transfers={transfers} />
       </div>
+
+      {user.role === "visitor" && (
+        <div className="mb-11 flex justify-center">
+          <p className="font-mono text-xs md:text-sm uppercase tracking-widest text-card-foreground bg-card bevel px-4 py-2 text-center">
+            {t("visitor.banner")}
+          </p>
+        </div>
+      )}
 
       <div className="grid md:grid-cols-2 gap-8">
         {/* Red Brick — Honor */}
@@ -287,7 +311,7 @@ export default function Home({ user, users }: Props) {
                   </legend>
                   <div className="flex gap-3 justify-center flex-wrap pt-1">
                     {users
-                      .filter((u) => u.id !== user.id)
+                      .filter((u) => u.id !== user.id && u.role === "knight")
                       .map((friend) => (
                         <Button
                           key={friend.id}
@@ -380,7 +404,7 @@ export default function Home({ user, users }: Props) {
                   </legend>
                   <div className="flex gap-3 justify-center flex-wrap pt-1">
                     {users
-                      .filter((u) => u.id !== user.id)
+                      .filter((u) => u.id !== user.id && u.role === "knight")
                       .map((friend) => (
                         <Button
                           key={friend.id}
