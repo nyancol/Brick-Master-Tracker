@@ -193,4 +193,66 @@ createTableIfNotExists(`
   );
 `);
 
+const GENESIS_MS = Date.UTC(2026, 6, 1);
+export { GENESIS_MS };
+
+const GENESIS_STORIES: Record<string, string> = {
+  red: "En l'an de grâce MMXXVI, le premier jour de juillet, le Brick d'Honneur fut forgé et confié à son premier détenteur.",
+  blue: "En l'an de grâce MMXXVI, le premier jour de juillet, le Brick de la Honte fut maudit et posé entre les mains de son premier porteur.",
+};
+
+export function ensureGenesisRow(
+  color: "red" | "blue",
+  toId: number,
+  transferredAt: number = GENESIS_MS,
+): void {
+  const existing = sqlite
+    .prepare("SELECT id FROM transfer_history WHERE color = ? AND from_id IS NULL")
+    .get(color);
+  if (existing) return;
+
+  const result = sqlite
+    .prepare(
+      "INSERT INTO transfer_history (color, from_id, to_id, transferred_by_id, transferred_at) VALUES (?, NULL, ?, ?, ?)",
+    )
+    .run(color, toId, toId, transferredAt);
+  const transferId = Number(result.lastInsertRowid);
+
+  sqlite.prepare(
+    "INSERT INTO transfer_story (transfer_id, description, edited_by, edited_at, created_at) VALUES (?, ?, NULL, ?, ?)",
+  ).run(transferId, GENESIS_STORIES[color] ?? "", GENESIS_MS, GENESIS_MS);
+}
+
+const GENESIS_COLORS = ["red", "blue"] as const;
+for (const color of GENESIS_COLORS) {
+  const existing = sqlite
+    .prepare("SELECT id FROM transfer_history WHERE color = ? AND from_id IS NULL")
+    .get(color);
+  if (existing) continue;
+
+  const earliest = sqlite
+    .prepare(
+      "SELECT from_id, transferred_at FROM transfer_history WHERE color = ? AND from_id IS NOT NULL ORDER BY transferred_at ASC, id ASC LIMIT 1",
+    )
+    .get(color) as { from_id: number; transferred_at: number } | undefined;
+
+  if (earliest) {
+    ensureGenesisRow(
+      color,
+      earliest.from_id,
+      earliest.transferred_at < GENESIS_MS ? earliest.transferred_at : GENESIS_MS,
+    );
+    console.log(`Backfilled genesis row for ${color} brick`);
+    continue;
+  }
+
+  const state = sqlite
+    .prepare("SELECT holder_id FROM brick_state WHERE color = ?")
+    .get(color) as { holder_id: number | null } | undefined;
+  if (state?.holder_id) {
+    ensureGenesisRow(color, state.holder_id);
+    console.log(`Backfilled genesis row for ${color} brick (holder fallback)`);
+  }
+}
+
 export default sqlite;

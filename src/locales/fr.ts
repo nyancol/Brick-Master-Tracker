@@ -20,6 +20,7 @@ const fr = {
     editedBy: "Modifié par",
     on: "le",
     yearGroup: "Année",
+    forgedUnto: "La {brick} fut forgée et remise à {name}",
   },
   modal: {
     cancel: "Annuler",
@@ -40,7 +41,12 @@ const fr = {
   logout: "Fuir le donjon",
   marquee: {
     template: "Oyez ! Oyez ! {brick} est passée de {from} à {to} !",
+    forged: "Oyez ! Oyez ! La {brick} fut forgée et remise à {to} !",
     empty: "Oyez ! Oyez ! Venez contempler les Briques de l'Honneur et de la Honte !",
+  },
+  tenure: {
+    ledgerTitle: "Registre des Tenures",
+    neverHeld: "ne l'a jamais tenue",
   },
   footer: {
     counterLabel: "Tu es le visiteur numéro",
@@ -67,7 +73,6 @@ const fr = {
     refuseHonor: "Impossible de fermer l'Honneur !",
     refuseShame: "La Honte s'accroche encore à toi !",
     brickCount: "1 brique(s)",
-    daysHeld: "détenue depuis {days} j",
     modem: "modem 56k",
     bestowTitle: "Décerner la Brique — {name}",
     offloadTitle: "Refiler la Brique — {name}",

@@ -114,8 +114,12 @@ const upload = multer({
  *           enum: [red, blue]
  *         fromId:
  *           type: integer
+ *           nullable: true
+ *           description: Null for genesis rows (brick founding)
  *         fromName:
  *           type: string
+ *           nullable: true
+ *           description: Null for genesis rows (brick founding)
  *         toId:
  *           type: integer
  *         toName:
@@ -636,6 +640,10 @@ app.get("/bricks", (_req, res) => {
  *     tags: [Transfers]
  *     summary: Get transfer history
  *     operationId: getTransfers
+ *     description: >
+ *       Array of transfers ordered by date descending. Includes one synthetic
+ *       genesis row per brick color anchoring the first holder's tenure; genesis
+ *       rows have `fromId` and `fromName` set to null.
  *     responses:
  *       200:
  *         description: Array of transfers ordered by date descending
@@ -663,7 +671,7 @@ app.get("/transfers", (_req, res) => {
       .all() as Array<{
       id: number;
       color: string;
-      from_id: number;
+      from_id: number | null;
       to_id: number;
       transferred_by_id: number;
       transferred_at: number;
@@ -676,7 +684,7 @@ app.get("/transfers", (_req, res) => {
         id: r.id,
         color: r.color,
         fromId: r.from_id,
-        fromName: r.from_name ?? "Unknown",
+        fromName: r.from_name,
         toId: r.to_id,
         toName: r.to_name ?? "Unknown",
         transferredById: r.transferred_by_id,
@@ -725,7 +733,7 @@ app.get("/transfers/:id/story", (req, res) => {
       )
       .get(Number(req.params.id)) as {
       description: string;
-      edited_by: number;
+      edited_by: number | null;
       edited_at: number;
       edited_by_name: string | null;
     } | undefined;
@@ -750,7 +758,7 @@ app.get("/transfers/:id/story", (req, res) => {
     res.json({
       description: story.description,
       editedBy: story.edited_by,
-      editedByName: story.edited_by_name ?? "Unknown",
+      editedByName: story.edited_by_name,
       editedAt: new Date(story.edited_at).toISOString(),
       images: images.map((img) => ({
         id: img.id,

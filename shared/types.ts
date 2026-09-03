@@ -24,8 +24,8 @@ export interface BrickState {
 export interface Transfer {
   id: number;
   color: "red" | "blue";
-  fromId: number;
-  fromName: string;
+  fromId: number | null;
+  fromName: string | null;
   toId: number;
   toName: string;
   transferredById: number;
@@ -34,10 +34,10 @@ export interface Transfer {
 }
 
 export interface TransferStory {
-  description: string;
-  editedBy: number;
-  editedByName: string;
-  editedAt: string;
+  description: string | null;
+  editedBy: number | null;
+  editedByName: string | null;
+  editedAt: string | null;
 }
 
 export interface TransferImage {

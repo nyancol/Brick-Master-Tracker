@@ -6,14 +6,15 @@ import {
   useTransfers,
   type AuthUser,
   type UserEntry,
-  type Transfer,
 } from "@/api";
 import { useToast } from "@/hooks/use-toast";
 import { t, getLanguage, changeLanguage } from "@/hooks/use-translation";
 import { useSfx } from "@/hooks/use-sfx";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
+import { computeTenures, formatDays, type TenureData } from "@/lib/tenure";
 import TransferModal from "@/components/TransferModal";
 import ChroniclesView from "@/components/ChroniclesView";
+import LiveTenure from "@/components/LiveTenure";
 import ThemeToggle from "@/components/ThemeToggle";
 import LuteToggle from "@/components/kitsch/LuteToggle";
 import SfxToggle from "@/components/kitsch/SfxToggle";
@@ -30,22 +31,71 @@ const LANGS = [
   { code: "fr", label: "FR" },
 ] as const;
 
-function computeDaysHeld(
-  transfers: Transfer[] | undefined,
-  color: "red" | "blue",
-): number | null {
-  const times = (transfers ?? [])
-    .filter((tr) => tr.color === color)
-    .map((tr) => new Date(tr.transferredAt).getTime())
-    .filter((n) => !Number.isNaN(n));
-  if (times.length === 0) return null;
-  const last = Math.max(...times);
-  return Math.max(0, Math.floor((Date.now() - last) / 86_400_000));
+interface LedgerRow {
+  userId: number;
+  username: string;
+  totalMs: number;
+  closedMs: number;
+  isCurrent: boolean;
 }
 
-function daysHeldLabel(days: number | null): string {
-  if (days === null) return "—";
-  return t("window.daysHeld").replace("{days}", String(days));
+function buildLedgerRows(tenure: TenureData, users: UserEntry[]): LedgerRow[] {
+  return users
+    .map((u) => ({
+      userId: u.id,
+      username: u.username,
+      totalMs: tenure.totalsMs.get(u.id) ?? 0,
+      closedMs: tenure.closedMs.get(u.id) ?? 0,
+      isCurrent: tenure.currentHolderId === u.id,
+    }))
+    .sort((a, b) => b.totalMs - a.totalMs);
+}
+
+function TenureLedger({
+  tenure,
+  users,
+  accentClass,
+}: {
+  tenure: TenureData;
+  users: UserEntry[];
+  accentClass: string;
+}) {
+  const lang = getLanguage();
+  return (
+    <fieldset className="group-box w-full px-3 pb-3 pt-1.5">
+      <legend className={`font-mono text-xs uppercase tracking-widest ${accentClass}`}>
+        {t("tenure.ledgerTitle")}
+      </legend>
+      <ul className="w-full pt-1">
+        {buildLedgerRows(tenure, users).map((row) => (
+          <li
+            key={row.userId}
+            className={`flex items-center justify-between gap-2 px-2 py-1 font-mono text-xs ${
+              row.isCurrent ? "font-bold text-gold" : "text-muted-foreground"
+            }`}
+          >
+            <span className="truncate">
+              {row.isCurrent ? "► " : ""}
+              {row.username}
+            </span>
+            {row.isCurrent && tenure.currentHolderSinceMs != null ? (
+              <LiveTenure
+                closedMs={row.closedMs}
+                sinceMs={tenure.currentHolderSinceMs}
+                className="shrink-0"
+              />
+            ) : row.totalMs > 0 ? (
+              <span className="shrink-0">{formatDays(row.totalMs, lang)}</span>
+            ) : (
+              <span className="shrink-0 italic">
+                {formatDays(0, lang)} · {t("tenure.neverHeld")}
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </fieldset>
+  );
 }
 
 interface Props {
@@ -97,6 +147,9 @@ export default function Home({ user, users }: Props) {
 
   const redBrick = bricks?.find((b) => b.color === "red");
   const blueBrick = bricks?.find((b) => b.color === "blue");
+
+  const redTenure = useMemo(() => computeTenures(transfers, "red"), [transfers]);
+  const blueTenure = useMemo(() => computeTenures(transfers, "blue"), [transfers]);
 
   const isRedHolder = redBrick?.holderId === user.id;
   const isBlueHolder = blueBrick?.holderId === user.id;
@@ -194,7 +247,21 @@ export default function Home({ user, users }: Props) {
             statusBar={
               <StatusBar
                 left={t("window.brickCount")}
-                right={`${daysHeldLabel(computeDaysHeld(transfers, "red"))} · ${t("window.modem")}`}
+                right={
+                  redTenure.currentHolderId != null &&
+                  redTenure.currentHolderSinceMs != null ? (
+                    <>
+                      <LiveTenure
+                        closedMs={redTenure.closedMs.get(redTenure.currentHolderId) ?? 0}
+                        sinceMs={redTenure.currentHolderSinceMs}
+                      />
+                      {" · "}
+                      {t("window.modem")}
+                    </>
+                  ) : (
+                    `— · ${t("window.modem")}`
+                  )
+                }
               />
             }
             contentClassName="flex flex-col items-center text-center space-y-5 p-6"
@@ -246,6 +313,7 @@ export default function Home({ user, users }: Props) {
                 </p>
               )}
             </div>
+            <TenureLedger tenure={redTenure} users={users} accentClass="text-honor/80" />
           </WindowFrame>
         </div>
 
@@ -272,7 +340,21 @@ export default function Home({ user, users }: Props) {
             statusBar={
               <StatusBar
                 left={t("window.brickCount")}
-                right={`${daysHeldLabel(computeDaysHeld(transfers, "blue"))} · ${t("window.modem")}`}
+                right={
+                  blueTenure.currentHolderId != null &&
+                  blueTenure.currentHolderSinceMs != null ? (
+                    <>
+                      <LiveTenure
+                        closedMs={blueTenure.closedMs.get(blueTenure.currentHolderId) ?? 0}
+                        sinceMs={blueTenure.currentHolderSinceMs}
+                      />
+                      {" · "}
+                      {t("window.modem")}
+                    </>
+                  ) : (
+                    `— · ${t("window.modem")}`
+                  )
+                }
               />
             }
             contentClassName="flex flex-col items-center text-center space-y-5 p-6"
@@ -324,6 +406,7 @@ export default function Home({ user, users }: Props) {
                 </p>
               )}
             </div>
+            <TenureLedger tenure={blueTenure} users={users} accentClass="text-shame/80" />
           </WindowFrame>
         </div>
       </div>

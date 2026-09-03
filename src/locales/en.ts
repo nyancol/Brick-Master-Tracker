@@ -20,6 +20,7 @@ const en = {
     editedBy: "Edited by",
     on: "on",
     yearGroup: "Year",
+    forgedUnto: "The {brick} was forged unto {name}",
   },
   modal: {
     cancel: "Cancel",
@@ -40,7 +41,12 @@ const en = {
   logout: "Flee þe Keep",
   marquee: {
     template: "Hear Ye! Hear Ye! {brick} hath passed from {from} unto {to}!",
+    forged: "Hear Ye! Hear Ye! The {brick} was forged unto {to}!",
     empty: "Hear Ye! Hear Ye! Come, behold þe Bricks of Honor and Shame!",
+  },
+  tenure: {
+    ledgerTitle: "Ledger of Tenure",
+    neverHeld: "hath never held it",
   },
   footer: {
     counterLabel: "Thou art visitor number",
@@ -67,7 +73,6 @@ const en = {
     refuseHonor: "Thou canst not close the Honor!",
     refuseShame: "The Shame clingeth to thee still!",
     brickCount: "1 brick(s)",
-    daysHeld: "{days} days held",
     modem: "56k modem",
     bestowTitle: "Bestow the Brick — {name}",
     offloadTitle: "Offload the Brick — {name}",

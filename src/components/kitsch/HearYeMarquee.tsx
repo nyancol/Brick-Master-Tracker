@@ -15,10 +15,15 @@ export default function HearYeMarquee({ transfers, loading }: Props) {
   } else if (latest) {
     const brickName =
       latest.color === "red" ? t("honor.name") : t("shame.name");
-    message = t("marquee.template")
-      .replace("{brick}", brickName)
-      .replace("{from}", latest.fromName)
-      .replace("{to}", latest.toName);
+    message =
+      latest.fromName == null
+        ? t("marquee.forged")
+            .replace("{brick}", brickName)
+            .replace("{to}", latest.toName)
+        : t("marquee.template")
+            .replace("{brick}", brickName)
+            .replace("{from}", latest.fromName)
+            .replace("{to}", latest.toName);
   } else {
     message = t("marquee.empty");
   }

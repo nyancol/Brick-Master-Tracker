@@ -12,6 +12,14 @@ context: |
   1. Never touch the real data. Run the built server with env overrides:
      PORT=3199 DATA_PATH=/tmp/opencode/bmt-data DB_PATH=/tmp/opencode/bmt-data/brick.db IMAGE_PATH=/tmp/opencode/bmt-data/upload node dist/server.mjs
      (bare `npm start` fails: the server mkdirs /app/data, a Docker path).
+     SERVER LIFECYCLE — stale servers from earlier sessions accumulate and can still own port 3199
+     with OLD code + OLD DB; requests then silently hit the wrong process and results look impossible
+     (e.g. data you never created). Before starting: `fuser -k 3199/tcp` and confirm with
+     `ss -tlnp | grep 3199`. After starting: check the log for the "listening" line, and treat any
+     impossible-looking API response as a stale-server suspect BEFORE debugging app code.
+     NEVER kill servers with `pkill -f "node dist/server.mjs"` from a shell whose own command line
+     contains that string — the pattern matches the invoking shell and kills your own session (tool
+     hangs until timeout). Use `fuser -k 3199/tcp`, or a character-class pattern (`pkill -f "[s]erver.mjs"`).
   2. Auth: dev test-user login is enabled by default.
      POST /api/auth/dev/login {"username":"yann"|"anselme"|"thomas"} → capture connect.sid cookie → addCookies in browser.
   3. Browser automation: playwright-core is NOT a repo dependency — install a scratch copy under /tmp/opencode
@@ -24,12 +32,23 @@ context: |
      - CSS animations: locator('.class') + getComputedStyle(el).animationName
      - Audio wiring (no ears needed): page.addInitScript stubbing HTMLMediaElement.prototype.play to count calls
        and record currentSrc — asserts a trigger plays the right file once; not acoustic quality.
-     - LocalStorage prefs: addInitScript(() => localStorage.setItem("lang","fr")) or in-page evaluate for theme.
+     - LocalStorage prefs: the app's providers OWN their keys and reapply them on mount, overriding
+       manual DOM mutations (a hand-added `.dark` class gets stripped → a "dark" screenshot that is
+       silently light). Set keys via addInitScript BEFORE load instead: localStorage.setItem("lang","fr")
+       (use-translation) and localStorage.setItem("theme","light"|"dark"|"system") (ThemeProvider).
      - Reduced motion: newContext({ reducedMotion: "reduce" }).
      - Eyeball PNGs with the Read tool — pixel truth is the final arbiter for design changes.
   6. Verification matrix for any new visible/moving/audible element: light + dark, en + fr,
      normal motion + prefers-reduced-motion, plus before/after full-page screenshots.
   7. Keep harness scripts in /tmp scratch (do not commit) unless asked; kill test servers when done.
+  8. Pure client libs (src/lib/*) with type-only imports are unit-testable with no test framework:
+     node ≥22 strips types, so a /tmp scratch .mjs can import the real .ts module and assert the math
+     directly. Keep such modules free of runtime imports (no React, no module-level i18n/localStorage)
+     to preserve this — pass lang/locale in as parameters instead.
+  9. Crafting SQLite fixtures by hand (scenario testing, migrations): write INTEGER ms epochs in UTC
+     (python time.mktime is LOCAL — causes off-by-hours date artifacts); use subs dev:yann|dev:anselme|dev:thomas
+     so seedDevUsers upserts keep your crafted ids; include same-timestamp tie rows when anything derives
+     order or "latest" from transferred_at (SQL/JS tie order is unspecified).
 
 # Per-artifact rules
 rules:

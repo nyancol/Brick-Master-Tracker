@@ -1,7 +1,7 @@
 import * as client from "openid-client";
 import type { Configuration, TokenEndpointResponseHelpers } from "openid-client";
 import { randomBytes } from "node:crypto";
-import db from "./db.js";
+import db, { ensureGenesisRow } from "./db.js";
 import type { User, SessionUser } from "../shared/types.js";
 
 let oidcConfig: Configuration | null = null;
@@ -193,6 +193,7 @@ export function maybeBootstrapBricks(user: User): void {
     db.prepare(
       "INSERT INTO brick_state (color, holder_id, updated_at) VALUES (?, ?, ?)",
     ).run("red", user.id, Date.now());
+    ensureGenesisRow("red", user.id);
     console.log(`Bootstrapped red brick → ${user.displayName} (${user.sub})`);
   }
 
@@ -200,6 +201,7 @@ export function maybeBootstrapBricks(user: User): void {
     db.prepare(
       "INSERT INTO brick_state (color, holder_id, updated_at) VALUES (?, ?, ?)",
     ).run("blue", user.id, Date.now());
+    ensureGenesisRow("blue", user.id);
     console.log(`Bootstrapped blue brick → ${user.displayName} (${user.sub})`);
   }
 }
@@ -266,6 +268,7 @@ export function bootstrapDevBricks(): void {
     db.prepare(
       "INSERT INTO brick_state (color, holder_id, updated_at) VALUES (?, ?, ?)",
     ).run(owner.color, user.id, Date.now());
+    ensureGenesisRow(owner.color, user.id);
     console.log(`Bootstrapped ${owner.color} brick → ${devUser.displayName}`);
   }
 }

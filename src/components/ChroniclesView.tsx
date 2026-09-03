@@ -155,9 +155,22 @@ function ChronicleEntry({
             {transfer.color === "red" ? "✦" : "✦"}
           </span>
           <div className="flex items-center gap-3 font-mono text-sm md:text-base">
-            <span className="text-muted-foreground">{transfer.fromName}</span>
-            <ArrowRight className="w-4 h-4 text-gold/40" />
-            <span className="font-bold text-foreground">{transfer.toName}</span>
+            {transfer.fromId === null ? (
+              <span className="font-serif italic font-bold text-foreground">
+                {t("chronicles.forgedUnto")
+                  .replace(
+                    "{brick}",
+                    transfer.color === "red" ? t("honor.name") : t("shame.name"),
+                  )
+                  .replace("{name}", transfer.toName)}
+              </span>
+            ) : (
+              <>
+                <span className="text-muted-foreground">{transfer.fromName}</span>
+                <ArrowRight className="w-4 h-4 text-gold/40" />
+                <span className="font-bold text-foreground">{transfer.toName}</span>
+              </>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-3">

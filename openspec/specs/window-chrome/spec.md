@@ -48,11 +48,12 @@ Each brick window SHALL include a status bar strip below the content.
 #### Scenario: Status bar contents
 - **WHEN** a brick window is rendered
 - **THEN** the status bar SHALL show a brick count ("1 brick(s)") on the left
-- **AND** the days the current holder has held the brick on the right, followed by an era joke label (e.g. "56k modem")
+- **AND** the current holder's live tenure (days, hours, minutes, seconds, ticking every second) on the right, followed by an era joke label (e.g. "56k modem")
 
 #### Scenario: Days held computation
-- **WHEN** the status bar is rendered
-- **THEN** days held SHALL be computed client-side from the most recent transfer timestamp for that brick color (0 days on the day of transfer)
+- **WHEN** the status bar tenure is rendered
+- **THEN** it SHALL be derived from the shared genesis-aware tenure computation (genesis row anchored at the founding epoch), so a genesis holder shows a real duration instead of a placeholder
+- **AND** the status bar tenure SHALL match the current holder's tenure shown in the brick window's tenure ledger
 
 ### Requirement: Transfer Modal Dialog Chrome
 The transfer modal SHALL be rendered as a Win98 dialog window with a titled title bar, replacing the current borderless header.

@@ -22,8 +22,8 @@ export interface BrickState {
 export interface Transfer {
   id: number;
   color: BrickColor;
-  fromId: number;
-  fromName: string;
+  fromId: number | null;
+  fromName: string | null;
   toId: number;
   toName: string;
   transferredById: number;
