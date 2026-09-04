@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import {
   useBricks,
   transferBrick,
+  seizeBlueBrick,
   useTransfers,
   type AuthUser,
   type UserEntry,
@@ -110,12 +111,13 @@ export default function Home({ user, users }: Props) {
   const { toast } = useToast();
   const { play: playSfx } = useSfx();
   const { data: bricks, loading: bricksLoading, refetch: refetchBricks } = useBricks();
-  const { data: transfers } = useTransfers();
+  const { data: transfers, refetch: refetchTransfers } = useTransfers();
   const [pending, setPending] = useState(false);
   const [modal, setModal] = useState<{
     color: "red" | "blue";
     recipientId: number;
     recipientName: string;
+    seize?: boolean;
   } | null>(null);
   const [chroniclesKey, setChroniclesKey] = useState(0);
 
@@ -124,19 +126,30 @@ export default function Home({ user, users }: Props) {
       if (!modal) return;
       setPending(true);
       try {
-        await transferBrick(modal.color, modal.recipientId, description, imageIds);
+        if (modal.seize) {
+          await seizeBlueBrick(description, imageIds);
+        } else {
+          await transferBrick(modal.color, modal.recipientId, description, imageIds);
+        }
         playSfx();
         setModal(null);
         refetchBricks();
+        refetchTransfers();
         setChroniclesKey((k) => k + 1);
       } catch (err) {
         const raw = err instanceof Error ? err.message : String(err);
         const description =
-          raw === "Only knights can transfer this brick"
+          raw.includes("Only knights can transfer this brick")
             ? t("transfer.onlyKnights")
-            : raw === "Recipient is not a participant — only knights can hold the brick"
+            : raw.includes("Recipient is not a participant — only knights can hold the brick")
               ? t("transfer.recipientNotKnight")
-              : raw;
+              : raw.includes("The Shame cannot be given")
+                ? t("transfer.shameCannotBeGiven")
+                : raw.includes("Only another knight may seize the Shame")
+                  ? t("transfer.seizeOnlyAnotherKnight")
+                  : raw.includes("Only knights can seize the Shame")
+                    ? t("transfer.seizeOnlyKnights")
+                    : raw;
         toast({
           title: t("transferFailed"),
           description,
@@ -146,7 +159,7 @@ export default function Home({ user, users }: Props) {
         setPending(false);
       }
     },
-    [modal, refetchBricks, toast],
+    [modal, refetchBricks, refetchTransfers, toast],
   );
 
   const handleLangChange = useCallback(() => {
@@ -376,30 +389,30 @@ export default function Home({ user, users }: Props) {
             </div>
             <div className="w-full space-y-3 border-t-2 border-shame/30 pt-4">
               {isBlueHolder ? (
+                <p className="text-sm font-mono text-shame/70 uppercase tracking-widest">
+                  {t("shame.holderWaiting")}
+                </p>
+              ) : user.role === "knight" ? (
                 <fieldset className="group-box w-full px-3 pb-3 pt-1.5">
                   <legend className="font-mono text-xs uppercase tracking-widest text-shame/80">
-                    {t("shame.offloadTo")}
+                    {t("shame.seize")}
                   </legend>
-                  <div className="flex gap-3 justify-center flex-wrap pt-1">
-                    {users
-                      .filter((u) => u.id !== user.id && u.role === "knight")
-                      .map((friend) => (
-                        <Button
-                          key={friend.id}
-                          variant="outline"
-                          className="flex-1 bg-card text-shame hover:bg-shame hover:text-primary-foreground"
-                          onClick={() =>
-                            setModal({
-                              color: "blue",
-                              recipientId: friend.id,
-                              recipientName: friend.username,
-                            })
-                          }
-                          disabled={pending}
-                        >
-                          {friend.username}
-                        </Button>
-                      ))}
+                  <div className="flex justify-center pt-1">
+                    <Button
+                      variant="outline"
+                      className="bg-card text-shame hover:bg-shame hover:text-primary-foreground px-10"
+                      onClick={() =>
+                        setModal({
+                          color: "blue",
+                          recipientId: blueBrick?.holderId ?? -1,
+                          recipientName: blueBrick?.holderName || "someone",
+                          seize: true,
+                        })
+                      }
+                      disabled={pending || !blueBrick}
+                    >
+                      {t("shame.seize")}
+                    </Button>
                   </div>
                 </fieldset>
               ) : (
@@ -423,6 +436,7 @@ export default function Home({ user, users }: Props) {
         <TransferModal
           color={modal.color}
           recipientName={modal.recipientName}
+          seize={modal.seize}
           onConfirm={handleTransferConfirm}
           onCancel={() => setModal(null)}
         />

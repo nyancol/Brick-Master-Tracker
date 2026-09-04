@@ -16,11 +16,12 @@ type ImageState =
 interface Props {
   color: BrickColor;
   recipientName: string;
+  seize?: boolean;
   onConfirm: (description: string, imageIds: number[]) => void;
   onCancel: () => void;
 }
 
-export default function TransferModal({ color, recipientName, onConfirm, onCancel }: Props) {
+export default function TransferModal({ color, recipientName, seize, onConfirm, onCancel }: Props) {
   const [description, setDescription] = useState("");
   const [images, setImages] = useState<ImageState[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -110,9 +111,11 @@ export default function TransferModal({ color, recipientName, onConfirm, onCance
       <div className="w-full max-w-lg animate-seal-stamp">
         <WindowFrame
           title={
-            color === "red"
-              ? t("window.bestowTitle").replace("{name}", recipientName)
-              : t("window.offloadTitle").replace("{name}", recipientName)
+            seize
+              ? t("window.seizeTitle").replace("{name}", recipientName)
+              : color === "red"
+                ? t("window.bestowTitle").replace("{name}", recipientName)
+                : t("window.offloadTitle").replace("{name}", recipientName)
           }
           icon={{ src: color === "red" ? "/gifs/swords.gif" : "/gifs/skull.gif" }}
           titleBarClassName={
@@ -124,7 +127,11 @@ export default function TransferModal({ color, recipientName, onConfirm, onCance
           onClose={onCancel}
           statusBar={
             <StatusBar
-              left={t("window.recipient").replace("{name}", recipientName)}
+              left={
+                seize
+                  ? t("window.seizeFrom").replace("{name}", recipientName)
+                  : t("window.recipient").replace("{name}", recipientName)
+              }
               right={t("window.modem")}
             />
           }

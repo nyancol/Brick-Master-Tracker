@@ -11,6 +11,9 @@ const en = {
     name: "Brick of Shame",
     cursedUpon: "Currently cursed upon",
     offloadTo: "Offload upon",
+    seize: "Seize the Shame",
+    holderWaiting:
+      "The Shame clingeth to thee still — only a noble knight may seize it from thee.",
     waitingForTransfer: "Waiting for {name} to transfer…",
   },
   chronicles: {
@@ -51,6 +54,11 @@ const en = {
     onlyKnights: "Only Knights of Friendship can transfer the brick.",
     recipientNotKnight:
       "That soul is not a participant — only Knights of Friendship can hold the brick.",
+    shameCannotBeGiven:
+      "The Shame cannot be given — it must be seized by another knight.",
+    seizeOnlyAnotherKnight:
+      "The Shame is thine already — only another knight may seize it from thee.",
+    seizeOnlyKnights: "Only Knights of Friendship may seize the Shame.",
   },
   marquee: {
     template: "Hear Ye! Hear Ye! {brick} hath passed from {from} unto {to}!",
@@ -110,6 +118,8 @@ const en = {
     modem: "56k modem",
     bestowTitle: "Bestow the Brick — {name}",
     offloadTitle: "Offload the Brick — {name}",
+    seizeTitle: "Seize the Shame — {name}",
+    seizeFrom: "Seizing from: {name}",
     recipient: "Recipient: {name}",
   },
   login: {

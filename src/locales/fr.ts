@@ -10,7 +10,10 @@ const fr = {
   shame: {
     name: "Brique de la Honte",
     cursedUpon: "Actuellement maudite sur",
-    offloadTo: "Refiler à",
+    offloadTo: "Refler à",
+    seize: "Endosser la Honte",
+    holderWaiting:
+      "La Honte s'accroche encore à toi — seul un noble chevalier peut l'endosser à ta place.",
     waitingForTransfer: "En attente que {name} transfère…",
   },
   chronicles: {
@@ -51,6 +54,11 @@ const fr = {
     onlyKnights: "Seuls les Chevaliers de l'Amitié peuvent transférer la brique.",
     recipientNotKnight:
       "Cette âme n'est pas un participant — seuls les Chevaliers de l'Amitié peuvent porter la brique.",
+    shameCannotBeGiven:
+      "La Honte ne peut être refflée — elle doit être endossée par un autre chevalier.",
+    seizeOnlyAnotherKnight:
+      "La Honte est déjà la tienne — seul un autre chevalier peut l'endosser à ta place.",
+    seizeOnlyKnights: "Seuls les Chevaliers de l'Amitié peuvent endosser la Honte.",
   },
   marquee: {
     template: "Oyez ! Oyez ! {brick} est passée de {from} à {to} !",
@@ -109,7 +117,9 @@ const fr = {
     brickCount: "1 brique(s)",
     modem: "modem 56k",
     bestowTitle: "Décerner la Brique — {name}",
-    offloadTitle: "Refiler la Brique — {name}",
+    offloadTitle: "Refler la Brique — {name}",
+    seizeTitle: "Endosser la Honte — {name}",
+    seizeFrom: "Endossée à la place de : {name}",
     recipient: "Destinataire : {name}",
   },
   login: {

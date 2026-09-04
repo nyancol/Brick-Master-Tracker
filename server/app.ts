@@ -930,16 +930,16 @@ app.put("/transfers/:id/story", requireAuth, (req, res) => {
     }
 
     const transfer = db
-      .prepare("SELECT from_id FROM transfer_history WHERE id = ?")
-      .get(transferId) as { from_id: number } | undefined;
+      .prepare("SELECT transferred_by_id FROM transfer_history WHERE id = ?")
+      .get(transferId) as { transferred_by_id: number } | undefined;
 
     if (!transfer) {
       res.status(404).json({ error: "Transfer not found" });
       return;
     }
 
-    if (transfer.from_id !== userId) {
-      res.status(403).json({ error: "Only the sender can edit the story" });
+    if (transfer.transferred_by_id !== userId) {
+      res.status(403).json({ error: "Only the transfer's actor can edit the story" });
       return;
     }
 
@@ -1025,7 +1025,10 @@ app.put("/transfers/:id/story", requireAuth, (req, res) => {
  *             schema:
  *               $ref: "#/components/schemas/Error"
  *       403:
- *         description: Only knights who are the current holder can transfer
+ *         description: >
+ *           Only knights who are the current holder can transfer. The blue brick
+ *           (Shame) cannot be transferred by anyone — it must be seized via
+ *           /bricks/blue/seize.
  *         content:
  *           application/json:
  *             schema:
@@ -1037,6 +1040,13 @@ app.post("/bricks/:color/transfer", requireAuth, (req, res) => {
 
   if (!VALID_COLORS.has(color)) {
     res.status(400).json({ error: "Invalid brick color" });
+    return;
+  }
+
+  if (color === "blue") {
+    res
+      .status(403)
+      .json({ error: "The Shame cannot be given — it must be seized" });
     return;
   }
 
@@ -1151,6 +1161,158 @@ app.post("/bricks/:color/transfer", requireAuth, (req, res) => {
     res.json(result.data);
   } catch (err) {
     console.error("POST transfer failed:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /bricks/blue/seize
+/**
+ * @openapi
+ * /bricks/blue/seize:
+ *   post:
+ *     tags: [Transfers]
+ *     summary: Seize the Brick of Shame unto oneself
+ *     description: >
+ *       The Shame cannot be given by its holder — it must be claimed.
+ *       Any authenticated knight other than the current holder may seize it,
+ *       becoming the new holder. The description records the seizing knight's motive.
+ *     operationId: seizeBlueBrick
+ *     security:
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [description]
+ *             properties:
+ *               description:
+ *                 type: string
+ *                 description: Motive for claiming the Shame
+ *               imageIds:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 description: IDs of staged images to associate
+ *     responses:
+ *       200:
+ *         description: Seizure successful, returns updated brick state
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/BrickState"
+ *       400:
+ *         description: Invalid or missing description
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ *       403:
+ *         description: Only knights other than the current holder may seize
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: "#/components/schemas/Error"
+ */
+app.post("/bricks/blue/seize", requireAuth, (req, res) => {
+  const { description, imageIds } = req.body ?? {};
+
+  if (!description || typeof description !== "string" || !description.trim()) {
+    res.status(400).json({ error: "Description is required" });
+    return;
+  }
+
+  const picIds: number[] = Array.isArray(imageIds) ? imageIds : [];
+  const currentUserId = req.session.user!.id;
+
+  const currentUser = db
+    .prepare("SELECT role FROM users WHERE id = ?")
+    .get(currentUserId) as { role: string } | undefined;
+
+  if (!currentUser || currentUser.role !== "knight") {
+    res.status(403).json({ error: "Only knights can seize the Shame" });
+    return;
+  }
+
+  type TxResult =
+    | { error: string; status: 404 | 403 }
+    | { data: Record<string, unknown> };
+
+  try {
+    const result = db.transaction((): TxResult => {
+      const current = db
+        .prepare(
+          `SELECT b.holder_id, u.username
+           FROM brick_state b
+           LEFT JOIN users u ON b.holder_id = u.id
+           WHERE b.color = 'blue'`,
+        )
+        .get() as
+        | { holder_id: number | null; username: string | null }
+        | undefined;
+
+      if (!current) {
+        return { error: "Brick not found", status: 404 };
+      }
+
+      if (current.holder_id === currentUserId) {
+        return {
+          error: "Only another knight may seize the Shame",
+          status: 403,
+        };
+      }
+
+      const seizer = db
+        .prepare("SELECT id, username, avatar_url FROM users WHERE id = ?")
+        .get(currentUserId) as
+        | { id: number; username: string; avatar_url: string | null }
+        | undefined;
+
+      if (!seizer) {
+        return { error: "Only knights can seize the Shame", status: 403 };
+      }
+
+      const now = Date.now();
+      db.prepare(
+        "UPDATE brick_state SET holder_id = ?, updated_at = ? WHERE color = 'blue'",
+      ).run(currentUserId, now);
+      const info = db.prepare(
+        "INSERT INTO transfer_history (color, from_id, to_id, transferred_by_id, transferred_at) VALUES ('blue', ?, ?, ?, ?)",
+      ).run(current.holder_id, currentUserId, currentUserId, now);
+
+      const transferId = info.lastInsertRowid as number;
+
+      db.prepare(
+        "INSERT INTO transfer_story (transfer_id, description, edited_by, edited_at, created_at) VALUES (?, ?, ?, ?, ?)",
+      ).run(transferId, description, currentUserId, now, now);
+
+      for (const imgId of picIds) {
+        db.prepare(
+          "UPDATE transfer_images SET transfer_id = ? WHERE id = ? AND transfer_id IS NULL AND uploaded_by = ?",
+        ).run(transferId, imgId, currentUserId);
+      }
+
+      return {
+        data: {
+          transferId,
+          color: "blue",
+          holderId: seizer.id,
+          holderName: seizer.username,
+          holderAvatarUrl: seizer.avatar_url,
+          updatedAt: new Date(now).toISOString(),
+        },
+      };
+    })() as unknown as TxResult;
+
+    if ("error" in result) {
+      res.status(result.status).json({ error: result.error });
+      return;
+    }
+
+    res.json(result.data);
+  } catch (err) {
+    console.error("POST seize failed:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -1378,16 +1540,16 @@ app.post("/transfers/:id/images", requireAuth, (req, res) => {
     const transferId = Number(req.params.id);
 
     const transfer = db
-      .prepare("SELECT from_id FROM transfer_history WHERE id = ?")
-      .get(transferId) as { from_id: number } | undefined;
+      .prepare("SELECT transferred_by_id FROM transfer_history WHERE id = ?")
+      .get(transferId) as { transferred_by_id: number } | undefined;
 
     if (!transfer) {
       res.status(404).json({ error: "Transfer not found" });
       return;
     }
 
-    if (transfer.from_id !== userId) {
-      res.status(403).json({ error: "Only the sender can upload images" });
+    if (transfer.transferred_by_id !== userId) {
+      res.status(403).json({ error: "Only the transfer's actor can upload images" });
       return;
     }
 
@@ -1459,16 +1621,16 @@ app.delete("/transfers/:id/images/:imageId", requireAuth, (req, res) => {
     const userId = req.session.user!.id;
 
     const transfer = db
-      .prepare("SELECT from_id FROM transfer_history WHERE id = ?")
-      .get(transferId) as { from_id: number } | undefined;
+      .prepare("SELECT transferred_by_id FROM transfer_history WHERE id = ?")
+      .get(transferId) as { transferred_by_id: number } | undefined;
 
     if (!transfer) {
       res.status(404).json({ error: "Transfer not found" });
       return;
     }
 
-    if (transfer.from_id !== userId) {
-      res.status(403).json({ error: "Only the sender can delete images" });
+    if (transfer.transferred_by_id !== userId) {
+      res.status(403).json({ error: "Only the transfer's actor can delete images" });
       return;
     }
 

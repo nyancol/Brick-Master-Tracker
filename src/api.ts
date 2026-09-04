@@ -186,6 +186,17 @@ export async function transferBrick(
   });
 }
 
+export async function seizeBlueBrick(
+  description: string,
+  imageIds: number[],
+): Promise<TransferResult> {
+  return fetchJson<TransferResult>("/api/bricks/blue/seize", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ description, imageIds }),
+  });
+}
+
 export async function fetchTransferStory(id: number): Promise<TransferStory> {
   return fetchJson<TransferStory>(`/api/transfers/${id}/story`);
 }
