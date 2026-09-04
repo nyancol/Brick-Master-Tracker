@@ -8,7 +8,7 @@ import {
   type UserEntry,
 } from "@/api";
 import { useToast } from "@/hooks/use-toast";
-import { t, getLanguage, changeLanguage } from "@/hooks/use-translation";
+import { t, getLanguage } from "@/hooks/use-translation";
 import { useSfx } from "@/hooks/use-sfx";
 import { useState, useCallback, useMemo } from "react";
 import { computeTenures, formatDays, type TenureData } from "@/lib/tenure";
@@ -25,11 +25,7 @@ import VisitorCounter from "@/components/kitsch/VisitorCounter";
 import WebringFooter from "@/components/kitsch/WebringFooter";
 import Badges88 from "@/components/kitsch/Badges88";
 import ConstructionBadge from "@/components/kitsch/ConstructionBadge";
-
-const LANGS = [
-  { code: "en", label: "EN" },
-  { code: "fr", label: "FR" },
-] as const;
+import { LanguageToggle } from "@/components/language-toggle";
 
 interface LedgerRow {
   userId: number;
@@ -153,8 +149,7 @@ export default function Home({ user, users }: Props) {
     [modal, refetchBricks, toast],
   );
 
-  const handleLangChange = useCallback((lang: string) => {
-    changeLanguage(lang as "en" | "fr");
+  const handleLangChange = useCallback(() => {
     forceRender((n) => n + 1);
   }, []);
 
@@ -199,24 +194,7 @@ export default function Home({ user, users }: Props) {
           <ThemeToggle />
           <LuteToggle />
           <SfxToggle />
-          <div className="flex gap-1">
-            {LANGS.map((lang) => {
-              const active = getLanguage() === lang.code;
-              return (
-                <button
-                  key={lang.code}
-                  onClick={() => handleLangChange(lang.code)}
-                  className={`font-mono text-xs px-3 py-1 bevel transition-colors ${
-                    active
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-card text-card-foreground hover:bg-muted"
-                  }`}
-                >
-                  {lang.label}
-                </button>
-              );
-            })}
-          </div>
+          <LanguageToggle onLangChange={handleLangChange} />
         </div>
         <div className="flex items-center justify-center gap-4">
           <img

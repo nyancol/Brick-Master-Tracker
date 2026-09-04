@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { t } from "@/hooks/use-translation";
 import { fetchDevLoginConfig, devLogin, type DevLoginInfo } from "@/api";
+import { LanguageToggle } from "@/components/language-toggle";
 
 export default function Login() {
+  const [, forceRender] = useState(0);
   const [devInfo, setDevInfo] = useState<DevLoginInfo | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -25,7 +27,10 @@ export default function Login() {
   const showDevPicker = devInfo?.enabled && devInfo.users.length > 0;
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center space-y-8 p-4">
+    <div className="relative min-h-screen flex flex-col items-center justify-center space-y-8 p-4">
+      <div className="absolute top-4 right-4">
+        <LanguageToggle onLangChange={() => forceRender((n) => n + 1)} />
+      </div>
       <div className="text-center space-y-4">
         <div className="flex items-center justify-center gap-4">
           <img
