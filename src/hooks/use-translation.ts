@@ -1,5 +1,6 @@
 import en from "../locales/en";
 import fr from "../locales/fr";
+import { resolveDefaultLanguage } from "../lib/language";
 
 const locales = { en, fr };
 type Lang = keyof typeof locales;
@@ -16,7 +17,7 @@ function getNested(obj: Record<string, unknown>, path: string): string {
 function getLang(): Lang {
   const stored = localStorage.getItem("lang");
   if (stored === "en" || stored === "fr") return stored;
-  return "en";
+  return resolveDefaultLanguage(navigator.language);
 }
 
 let currentLang: Lang = getLang();

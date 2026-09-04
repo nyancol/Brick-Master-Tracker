@@ -206,16 +206,17 @@ export function upsertUser(
 }
 
 export function maybeBootstrapBricks(user: User): void {
-  const count = db
-    .prepare("SELECT COUNT(*) as count FROM brick_state")
-    .get() as { count: number };
-
-  if (count.count > 0) return;
-
   const redOwner = process.env.OIDC_OWNER_RED;
   const blueOwner = process.env.OIDC_OWNER_BLUE;
+  if (!redOwner && !blueOwner) return;
 
-  if (redOwner && redOwner === user.sub) {
+  const heldColors = new Set(
+    (db.prepare("SELECT color FROM brick_state").all() as Array<{ color: string }>).map(
+      (r) => r.color,
+    ),
+  );
+
+  if (redOwner && redOwner === user.sub && !heldColors.has("red")) {
     db.prepare(
       "INSERT INTO brick_state (color, holder_id, updated_at) VALUES (?, ?, ?)",
     ).run("red", user.id, Date.now());
@@ -223,7 +224,7 @@ export function maybeBootstrapBricks(user: User): void {
     console.log(`Bootstrapped red brick → ${user.displayName} (${user.sub})`);
   }
 
-  if (blueOwner && blueOwner === user.sub) {
+  if (blueOwner && blueOwner === user.sub && !heldColors.has("blue")) {
     db.prepare(
       "INSERT INTO brick_state (color, holder_id, updated_at) VALUES (?, ?, ?)",
     ).run("blue", user.id, Date.now());
