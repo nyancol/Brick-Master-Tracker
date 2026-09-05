@@ -21,7 +21,7 @@ services:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in obs/.env}
     ports:
-      - "127.0.0.1:4318:4318"
+      - "4318:4318"
     volumes:
       - lgtm-data:/data
     networks:
