@@ -1,0 +1,38 @@
+# ============================================================================
+# Standalone observability stack (Grafana LGTM) — one instance for the whole
+# host. Every app instance (prod container, dev run, test run) exports
+# telemetry to it; instances distinguish themselves via OTEL_SERVICE_NAME and
+# OTEL_RESOURCE_ATTRIBUTES (deployment.environment.name).
+#
+#   cp .env.example .env   (set GRAFANA_ADMIN_PASSWORD)
+#   docker compose up -d
+#
+# - Grafana UI: route `lgtm:3000` through Caddy (caddy_public network)
+# - OTLP for containers on the shared `telemetry` network: http://lgtm:4318
+# - OTLP for host-run dev instances: http://127.0.0.1:4318 (loopback only —
+#   never publish 4317/4318 beyond loopback or route them through Caddy)
+# ============================================================================
+services:
+  lgtm:
+    image: grafana/otel-lgtm:0.32.1
+    container_name: lgtm
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in obs/.env}
+    ports:
+      - "127.0.0.1:4318:4318"
+    volumes:
+      - lgtm-data:/data
+    networks:
+      - telemetry
+      - caddy_public
+
+networks:
+  telemetry:
+  caddy_public:
+    external: true
+    name: "caddy_public"
+
+volumes:
+  lgtm-data:
