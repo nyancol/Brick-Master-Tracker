@@ -1,6 +1,8 @@
 import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { performance } from "node:perf_hooks";
+import logger from "./logger.js";
 
 const dataPath = process.env.DATA_PATH ?? "/app/data";
 mkdirSync(resolve(dataPath), { recursive: true });
@@ -11,6 +13,68 @@ mkdirSync(dirname(resolve(dbPath)), { recursive: true });
 const sqlite = new Database(dbPath);
 sqlite.pragma("journal_mode = WAL");
 sqlite.pragma("foreign_keys = ON");
+
+// =============================================================================
+// Slow-query instrumentation.
+//
+// better-sqlite3 is synchronous native code with no OpenTelemetry
+// instrumentation, so statement execution is timed here instead. The wrapper
+// is transparent: same synchronous semantics, same return values. Bound
+// parameter values are never logged (only the SQL text, truncated).
+// =============================================================================
+const SLOW_QUERY_THRESHOLD_MS = Number(process.env.SLOW_QUERY_THRESHOLD_MS || 100);
+const SQL_LOG_MAX_LENGTH = 200;
+const TIMED_STATEMENT_METHODS = new Set(["run", "get", "all", "iterate"]);
+
+type RawStatement = Database.Statement<unknown[], unknown>;
+type RawPrepare = (sql: string, ...params: unknown[]) => RawStatement;
+
+function truncateSql(sql: string): string {
+  return sql.length > SQL_LOG_MAX_LENGTH ? `${sql.slice(0, SQL_LOG_MAX_LENGTH)}…` : sql;
+}
+
+function recordIfSlow(sql: string, startedAt: number): void {
+  const durationMs = performance.now() - startedAt;
+  if (durationMs >= SLOW_QUERY_THRESHOLD_MS) {
+    logger.warn(
+      { slowQuery: { durationMs: Math.round(durationMs * 100) / 100, sql: truncateSql(sql) } },
+      "Slow SQL statement",
+    );
+  }
+}
+
+function instrumentStatement(statement: RawStatement, sql: string): RawStatement {
+  return new Proxy(statement, {
+    get(target, prop, receiver) {
+      const value = Reflect.get(target, prop, receiver);
+      if (typeof value !== "function" || !TIMED_STATEMENT_METHODS.has(String(prop))) {
+        return value;
+      }
+      return (...args: unknown[]) => {
+        const startedAt = performance.now();
+        try {
+          return Reflect.apply(value, target, args);
+        } finally {
+          recordIfSlow(sql, startedAt);
+        }
+      };
+    },
+  });
+}
+
+const rawPrepare = sqlite.prepare.bind(sqlite) as unknown as RawPrepare;
+(sqlite as { prepare: RawPrepare }).prepare = (sql, ...params) =>
+  instrumentStatement(rawPrepare(sql, ...params), sql);
+
+const rawExec = sqlite.exec.bind(sqlite);
+(sqlite as { exec: (sql: string) => unknown }).exec = (sql: string) => {
+  const startedAt = performance.now();
+  try {
+    return rawExec(sql);
+  } finally {
+    recordIfSlow(sql, startedAt);
+  }
+};
 
 // Create base tables
 sqlite.exec(`
@@ -35,7 +99,7 @@ sqlite.exec(`
 // Add username column if it doesn't exist (migration for existing databases)
 if (!columnExists("users", "username")) {
   sqlite.exec("ALTER TABLE users ADD COLUMN username TEXT NOT NULL DEFAULT ''");
-  console.log("Added username column to users table");
+  logger.info("Added username column to users table");
 }
 
 // Add role column if it doesn't exist (migration for existing databases).
@@ -44,7 +108,7 @@ if (!columnExists("users", "role")) {
   sqlite.exec(
     "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'knight' CHECK (role IN ('knight','visitor'))",
   );
-  console.log("Added role column to users table (backfilled existing users as knight)");
+  logger.info("Added role column to users table (backfilled existing users as knight)");
 }
 
 // Check if old TEXT column schema exists and migrate
@@ -96,7 +160,7 @@ if (columnExists("brick_state", "holder")) {
       .run(user.id, r.color);
   }
 
-  console.log("Migrated brick_state.holder → holder_id");
+  logger.info("Migrated brick_state.holder → holder_id");
 }
 
 // transfer_history: create with new schema, migrate if old columns exist
@@ -130,7 +194,7 @@ if (columnExists("transfer_history", "from_holder")) {
         .run(fromUser.id, toUser.id, fromUser.id, t.id);
     }
   }
-  console.log("Migrated transfer_history from_holder/to_holder → from_id/to_id");
+  logger.info("Migrated transfer_history from_holder/to_holder → from_id/to_id");
 }
 
 // Drop legacy TEXT columns if they still exist (after data migration)
@@ -153,7 +217,7 @@ if (columnExists("brick_state", "holder")) {
       }
     }
   }
-  console.log("Dropped legacy TEXT columns from brick_state");
+  logger.info("Dropped legacy TEXT columns from brick_state");
 }
 
 const keepTransferColumns = [
@@ -177,7 +241,7 @@ if (columnExists("transfer_history", "from_holder")) {
       }
     }
   }
-  console.log("Dropped legacy TEXT columns from transfer_history");
+  logger.info("Dropped legacy TEXT columns from transfer_history");
 }
 
 // Create story and image tables
@@ -279,7 +343,7 @@ for (const color of GENESIS_COLORS) {
       earliest.from_id,
       earliest.transferred_at < GENESIS_MS ? earliest.transferred_at : GENESIS_MS,
     );
-    console.log(`Backfilled genesis row for ${color} brick`);
+    logger.info(`Backfilled genesis row for ${color} brick`);
     continue;
   }
 
@@ -288,7 +352,7 @@ for (const color of GENESIS_COLORS) {
     .get(color) as { holder_id: number | null } | undefined;
   if (state?.holder_id) {
     ensureGenesisRow(color, state.holder_id);
-    console.log(`Backfilled genesis row for ${color} brick (holder fallback)`);
+    logger.info(`Backfilled genesis row for ${color} brick (holder fallback)`);
   }
 }
 

@@ -4,10 +4,12 @@ import multer from "multer";
 import { v4 as uuidv4 } from "uuid";
 import { mkdirSync, unlinkSync, existsSync } from "node:fs";
 import { join, resolve, extname } from "node:path";
+import { context, trace } from "@opentelemetry/api";
 import createSqliteStore from "better-sqlite3-session-store";
 import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
 import db from "./db.js";
+import logger from "./logger.js";
 import {
   initOidc,
   generateAuthUrl,
@@ -225,8 +227,21 @@ app.use(
   }),
 );
 
+// Request-scoped logger: carries trace/span ids when telemetry is active
+// so log records correlate with traces in the observability backend.
 app.use((req, _res, next) => {
-  console.log(`${req.method} ${req.url?.split("?")[0]}`);
+  const span = trace.getSpan(context.active());
+  const spanContext = span?.spanContext();
+  req.log = logger.child(
+    spanContext
+      ? {
+          trace_id: spanContext.traceId,
+          span_id: spanContext.spanId,
+          trace_flags: spanContext.traceFlags,
+        }
+      : {},
+  );
+  req.log.info(`${req.method} ${req.url?.split("?")[0]}`);
   next();
 });
 
@@ -368,7 +383,7 @@ app.post("/visits", (req, res) => {
 
     res.json({ count: row?.value ?? 0 });
   } catch (err) {
-    console.error("POST /visits failed:", err);
+    req.log.error({ err }, "POST /visits failed");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -391,7 +406,7 @@ app.post("/visits", (req, res) => {
  *             schema:
  *               $ref: "#/components/schemas/Error"
  */
-app.get("/auth/login", (_req, res) => {
+app.get("/auth/login", (req, res) => {
   const config = getOidcConfig();
   if (!config) {
     const err = getDiscoveryError() ?? "OIDC not configured";
@@ -402,7 +417,7 @@ app.get("/auth/login", (_req, res) => {
   generateAuthUrl()
     .then((url) => res.redirect(url))
     .catch((err) => {
-      console.error("Login redirect failed:", err);
+      req.log.error({ err }, "Login redirect failed");
       res.status(500).json({ error: "Internal server error" });
     });
 });
@@ -484,14 +499,14 @@ app.get("/auth/callback", async (req, res) => {
     req.session.user = { id: user.id, email: user.email };
     req.session.save((err) => {
       if (err) {
-        console.error("Session save failed:", err);
+        req.log.error({ err }, "Session save failed");
         res.status(500).json({ error: "Failed to create session" });
         return;
       }
       res.redirect("/");
     });
   } catch (err) {
-    console.error("Auth callback failed:", err);
+    req.log.error({ err }, "Auth callback failed");
     res
       .status(401)
       .json({ error: err instanceof Error ? err.message : "Authentication failed" });
@@ -513,7 +528,7 @@ app.get("/auth/callback", async (req, res) => {
 app.get("/auth/logout", (req, res) => {
   req.session.destroy((err) => {
     if (err) {
-      console.error("Logout failed:", err);
+      req.log.error({ err }, "Logout failed");
     }
     res.redirect("/");
   });
@@ -557,7 +572,7 @@ app.get("/auth/me", (req, res) => {
     const data = getAuthMe(req.session.user.id);
     res.json(data);
   } catch (err) {
-    console.error("GET /auth/me failed:", err);
+    req.log.error({ err }, "GET /auth/me failed");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -665,7 +680,7 @@ app.post("/auth/dev/login", (req, res) => {
   req.session.user = { id: user.id, email: user.email };
   req.session.save((err) => {
     if (err) {
-      console.error("Dev login session save failed:", err);
+      req.log.error({ err }, "Dev login session save failed");
       res.status(500).json({ error: "Failed to create session" });
       return;
     }
@@ -691,7 +706,7 @@ app.post("/auth/dev/login", (req, res) => {
  *               items:
  *                 $ref: "#/components/schemas/BrickState"
  */
-app.get("/bricks", (_req, res) => {
+app.get("/bricks", (req, res) => {
   try {
     const rows = db
       .prepare(
@@ -717,7 +732,7 @@ app.get("/bricks", (_req, res) => {
       })),
     );
   } catch (err) {
-    console.error("GET /bricks failed:", err);
+    req.log.error({ err }, "GET /bricks failed");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -744,7 +759,7 @@ app.get("/bricks", (_req, res) => {
  *               items:
  *                 $ref: "#/components/schemas/Transfer"
  */
-app.get("/transfers", (_req, res) => {
+app.get("/transfers", (req, res) => {
   try {
     const rows = db
       .prepare(
@@ -783,7 +798,7 @@ app.get("/transfers", (_req, res) => {
       })),
     );
   } catch (err) {
-    console.error("GET /transfers failed:", err);
+    req.log.error({ err }, "GET /transfers failed");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -859,7 +874,7 @@ app.get("/transfers/:id/story", (req, res) => {
       })),
     });
   } catch (err) {
-    console.error("GET /transfers/:id/story failed:", err);
+    req.log.error({ err }, "GET /transfers/:id/story failed");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -969,7 +984,7 @@ app.put("/transfers/:id/story", requireAuth, (req, res) => {
       editedAt: new Date(now).toISOString(),
     });
   } catch (err) {
-    console.error("PUT /transfers/:id/story failed:", err);
+    req.log.error({ err }, "PUT /transfers/:id/story failed");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -1160,7 +1175,7 @@ app.post("/bricks/:color/transfer", requireAuth, (req, res) => {
 
     res.json(result.data);
   } catch (err) {
-    console.error("POST transfer failed:", err);
+    req.log.error({ err }, "POST transfer failed");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -1312,7 +1327,7 @@ app.post("/bricks/blue/seize", requireAuth, (req, res) => {
 
     res.json(result.data);
   } catch (err) {
-    console.error("POST seize failed:", err);
+    req.log.error({ err }, "POST seize failed");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -1461,7 +1476,7 @@ app.delete("/uploads/staging/:id", requireAuth, (req, res) => {
 
     res.json({ deleted: true });
   } catch (err) {
-    console.error("DELETE /uploads/staging/:id failed:", err);
+    req.log.error({ err }, "DELETE /uploads/staging/:id failed");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -1651,7 +1666,7 @@ app.delete("/transfers/:id/images/:imageId", requireAuth, (req, res) => {
 
     res.json({ deleted: true });
   } catch (err) {
-    console.error("DELETE /transfers/:id/images/:imageId failed:", err);
+    req.log.error({ err }, "DELETE /transfers/:id/images/:imageId failed");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -1739,7 +1754,7 @@ app.get("/transfers/:id/comments", requireAuth, (req, res) => {
       })),
     );
   } catch (err) {
-    console.error("GET /transfers/:id/comments failed:", err);
+    req.log.error({ err }, "GET /transfers/:id/comments failed");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -1845,7 +1860,7 @@ app.post("/transfers/:id/comments", requireAuth, (req, res) => {
       huzzahedByMe: false,
     });
   } catch (err) {
-    console.error("POST /transfers/:id/comments failed:", err);
+    req.log.error({ err }, "POST /transfers/:id/comments failed");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -1933,7 +1948,7 @@ app.post("/transfers/:id/comments/:commentId/huzzah", requireAuth, (req, res) =>
 
     res.json({ huzzahCount: count.n });
   } catch (err) {
-    console.error("POST /transfers/:id/comments/:commentId/huzzah failed:", err);
+    req.log.error({ err }, "POST /transfers/:id/comments/:commentId/huzzah failed");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -2014,7 +2029,7 @@ app.post("/transfers/:id/comments/:commentId/blot", requireAuth, (req, res) => {
 
     res.json({ blottedAt: new Date(row.blotted_at).toISOString() });
   } catch (err) {
-    console.error("POST /transfers/:id/comments/:commentId/blot failed:", err);
+    req.log.error({ err }, "POST /transfers/:id/comments/:commentId/blot failed");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -2089,7 +2104,7 @@ app.delete("/transfers/:id/comments/:commentId", requireAuth, (req, res) => {
 
     res.json({ deleted: true });
   } catch (err) {
-    console.error("DELETE /transfers/:id/comments/:commentId failed:", err);
+    req.log.error({ err }, "DELETE /transfers/:id/comments/:commentId failed");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -2147,7 +2162,7 @@ app.get("/uploads/:filename", requireAuth, (req, res) => {
 
     res.type(img.mime_type).sendFile(filePath);
   } catch (err) {
-    console.error("GET /uploads/:filename failed:", err);
+    req.log.error({ err }, "GET /uploads/:filename failed");
     res.status(500).json({ error: "Internal server error" });
   }
 });

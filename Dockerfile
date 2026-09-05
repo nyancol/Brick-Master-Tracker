@@ -36,7 +36,7 @@ RUN pnpm install --frozen-lockfile --prod --ignore-scripts && \
 # Copy built artifacts from build stage
 COPY --from=build /app/dist ./dist
 
-RUN mkdir -p /app/data
+RUN mkdir -p /app/data && chown node:node /app/data
 VOLUME /app/data
 
 ENV NODE_ENV=production

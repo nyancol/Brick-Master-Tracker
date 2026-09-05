@@ -62,19 +62,26 @@ flowchart LR
 ```
 .
 ├── Dockerfile                  # Multi-stage build (node:24-alpine)
+├── compose.yaml                # Production app deployment
+├── compose.preprod.yaml        # Preprod override (isolated instance, :5173)
+├── obs/
+│   ├── compose.yaml            # Standalone Grafana LGTM observability stack
+│   └── .env.example            # Grafana admin credentials
 ├── pnpm-workspace.yaml         # onlyBuiltDependencies (better-sqlite3, esbuild)
 ├── tsconfig.json               # Strict TS config
 ├── vite.config.ts              # Vite + React + Tailwind + API dev middleware
-├── build-server.mjs            # esbuild → dist/server.mjs
+├── build-server.mjs            # esbuild → dist/server.mjs (+ telemetry chunks)
 ├── index.html                  # HTML shell
-├── .env.example                # PORT, DB_PATH
-├── mise.toml                     # Dev tools (node, pnpm, python, nvim, opencode, openspec)
+├── .env.example                # PORT, DB_PATH, OIDC, telemetry vars
+├── mise.toml                   # Dev tools + preprod tasks (preprod-up/down/logs)
 │
 ├── shared/
 │   └── constants.ts            # FRIENDS array — single source of truth
 │
 ├── server/
 │   ├── index.ts                # Production entry: Express + static + SPA fallback
+│   ├── telemetry.ts            # OpenTelemetry SDK bootstrap (OTLP-gated)
+│   ├── logger.ts               # pino structured logging (dev/prod/OTLP modes)
 │   ├── app.ts                  # Express app: routes, validation, logging
 │   └── db.ts                   # SQLite init, schema creation, idempotent seed
 │
@@ -172,7 +179,8 @@ The raw OpenAPI specification is available as JSON at `/api/api-docs.json`.
 | **Bundling** | Vite (SPA), esbuild (server) |
 | **i18n** | Custom hook (EN, FR) |
 | **Validation** | Manual input checks |
-| **Logging** | `console.log` |
+| **Logging** | pino (structured JSON; OTLP export to the observability stack) |
+| **Observability** | OpenTelemetry (traces, metrics) + Grafana LGTM stack |
 | **Container** | Docker multi-stage (Alpine) |
 | **Dev env** | mise (node, pnpm, python) |
 
@@ -275,4 +283,63 @@ docker run -v brick-data:/app/data -p 5000:5000 brick-tracker
 
 The Dockerfile is a multi-stage build:
 1. **Stage 1 (`build`)**: Install deps with `build-base` (for native compilation), run `pnpm build` (type-check + Vite + esbuild), prune devDependencies.
-2. **Stage 2 (`production`)**: Copy built artifacts and runtime deps. Run as non-root `appuser` (uid 1001). Mount a volume at `/app/data` to persist `brick.db`.
+2. **Stage 2 (`production`)**: Copy built artifacts and runtime deps. Run as non-root `node` user. Mount a volume at `/app/data` to persist `brick.db`.
+
+---
+
+## Deployment: production, preprod, and observability
+
+Three compose entry points share two Docker networks (`caddy_public` for anything behind the reverse proxy, `telemetry` for the observability backend):
+
+| Environment | Command | App URL | Data |
+|-------------|---------|---------|------|
+| **Production** | `docker compose up -d --build` | `:5000` (via Caddy) | bind mount `./brick-tracker-data` |
+| **Preprod** | `mise run preprod-up` | `https://brique-dev.patates.club` (`:5173`) | isolated volume `brick-tracker-preprod-data` |
+| **Observability** | `cd obs && docker compose up -d` | Grafana UI via Caddy (`lgtm:3000`) | volume `obs_lgtm-data` |
+
+Start the observability stack first — it creates the `telemetry` network every app instance joins.
+
+### Observability (one LGTM instance for the whole host)
+
+The stack lives in `obs/compose.yaml`: a single `grafana/otel-lgtm` container (embedded OTel collector + Prometheus + Loki + Tempo + Grafana). Every app instance — production container, preprod container, host-run dev server — exports traces, metrics, and logs to it and distinguishes itself by resource attributes:
+
+- `OTEL_SERVICE_NAME=brick-tracker` (stable across environments)
+- `OTEL_RESOURCE_ATTRIBUTES=deployment.environment.name=production|preprod|development`
+
+In Grafana, filter or group by `deployment.environment.name`. Host-run dev instances use the loopback-published collector (`OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318`); telemetry activates only when that endpoint is set. Collector ports are never exposed beyond loopback or routed through Caddy.
+
+### Preprod workflow
+
+Preprod is an isolated second instance of the same image for testing, running alongside production with **no observability of its own** — it ships telemetry to the shared LGTM tagged `deployment.environment.name=preprod`.
+
+```bash
+# Start (builds if needed) — production keeps running untouched
+mise run preprod-up
+
+# Follow logs / stop
+mise run preprod-logs
+mise run preprod-down        # keeps the preprod data volume
+```
+
+Characteristics (see `compose.preprod.yaml`):
+
+- Own container (`brick-tracker-preprod`) and data volume — test traffic never touches production data
+- Port `5173` (the dev-mode port); production stays on `5000`
+- `APP_URL=https://brique-dev.patates.club`, so OIDC redirects target the preprod domain
+
+Prerequisites for the login round-trip:
+
+1. The observability stack is up (`cd obs && docker compose up -d`).
+2. Pocket-ID's OIDC client allows the redirect URI `https://brique-dev.patates.club/api/auth/callback`.
+3. A Caddy route:
+   ```
+   brique-dev.patates.club {
+       reverse_proxy brick-tracker-preprod:5173
+   }
+   ```
+
+Full reset of the preprod environment:
+
+```bash
+docker compose -p brick-preprod -f compose.yaml -f compose.preprod.yaml down -v
+```

@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import app from "./app.js";
+import logger from "./logger.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distDir = path.resolve(__dirname, "..", "dist", "public");
@@ -31,5 +32,5 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 server.listen(port, () => {
-  console.log(`Brick Tracker listening on :${port}`);
+  logger.info(`Brick Tracker listening on :${port}`);
 });

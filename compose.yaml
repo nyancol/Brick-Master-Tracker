@@ -10,10 +10,21 @@ services:
     environment:
       DB_PATH: /app/data/brick.db
       IMAGE_PATH: /app/data/upload
+      # Pin inside the container: .env's DATA_PATH=./brick-tracker-data is a
+      # host-dev value and would make db.ts mkdir a root-owned path (EACCES).
+      DATA_PATH: /app/data
+      # Telemetry: OTLP endpoint of the standalone observability stack
+      # (obs/compose.yaml, service `lgtm` on the shared `telemetry` network).
+      # Override or empty from .env to disable telemetry.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://lgtm:4318}
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-brick-tracker}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      SLOW_QUERY_THRESHOLD_MS: ${SLOW_QUERY_THRESHOLD_MS:-100}
     env_file:
       - .env
     networks:
       - caddy_public
+      - telemetry
     volumes:
       - ./brick-tracker-data:/app/data
 
@@ -22,3 +33,6 @@ networks:
     driver: bridge
     external: true
     name: "caddy_public"
+  telemetry:
+    external: true
+    name: "telemetry"

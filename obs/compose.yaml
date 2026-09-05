@@ -31,6 +31,9 @@ services:
 
 networks:
   telemetry:
+    # Pin the real network name (compose would otherwise project-prefix it to
+    # obs_telemetry); app/preprod composes reference it as external: true.
+    name: telemetry
   caddy_public:
     external: true
     name: "caddy_public"

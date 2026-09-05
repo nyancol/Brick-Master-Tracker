@@ -1,0 +1,36 @@
+# ============================================================================
+# PREPROD deployment override — a second, isolated instance of the app for
+# testing, running ALONGSIDE production and reusing the standalone LGTM stack
+# (obs/compose.yaml) for telemetry. It runs NO observability of its own.
+#
+# Requires a distinct compose project so production containers stay untouched:
+#
+#   docker compose -p brick-preprod -f compose.yaml -f compose.preprod.yaml up -d --build
+#
+#   app       → http://localhost:5173  (prod stays on :5000)
+#   telemetry → http://lgtm:4318 via the shared `telemetry` network
+#   Grafana   → filter deployment.environment.name = preprod
+#
+# Isolation: own container name, own data volume, own compose project (its
+# default network is project-scoped). External networks (caddy_public,
+# telemetry) are shared by design.
+# ============================================================================
+services:
+  brick-tracker:
+    container_name: brick-tracker-preprod
+    ports: !override
+      - "5173:5173"
+    environment:
+      # Dev-mode port: preprod listens where dev does, prod keeps :5000.
+      PORT: 5173
+      # Public base URL behind Caddy — drives OIDC redirect URIs for this
+      # instance (APP_URL wins over the shared .env, which targets prod).
+      APP_URL: https://brique-dev.patates.club
+      # Distinguish this instance in the shared observability backend while
+      # keeping service.name stable (OTEL_SERVICE_NAME stays brick-tracker).
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment.name=preprod
+    volumes: !override
+      - brick-tracker-preprod-data:/app/data
+
+volumes:
+  brick-tracker-preprod-data:

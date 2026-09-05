@@ -2,6 +2,7 @@ import * as client from "openid-client";
 import type { Configuration, TokenEndpointResponseHelpers } from "openid-client";
 import { randomBytes } from "node:crypto";
 import db, { ensureGenesisRow } from "./db.js";
+import logger from "./logger.js";
 import type { User, SessionUser, UserRole } from "../shared/types.js";
 
 let oidcConfig: Configuration | null = null;
@@ -32,7 +33,7 @@ export function getDiscoveryError(): string | null {
 export async function initOidc(): Promise<void> {
   if (!issuerUrl || !clientId || !clientSecret) {
     discoveryError = "Missing OIDC configuration.";
-    console.warn(
+    logger.warn(
       "OIDC not configured — set OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, and either APP_URL or OIDC_REDIRECT_URL",
     );
     return;
@@ -45,10 +46,10 @@ export async function initOidc(): Promise<void> {
       undefined,
       client.ClientSecretPost(clientSecret),
     );
-    console.log(`OIDC client initialized for issuer: ${issuerUrl}`);
+    logger.info(`OIDC client initialized for issuer: ${issuerUrl}`);
   } catch (err) {
     discoveryError = `OIDC discovery failed: ${err instanceof Error ? err.message : String(err)}`;
-    console.error(discoveryError);
+    logger.error(discoveryError);
   }
 }
 
@@ -143,10 +144,9 @@ export async function handleCallback(
     : [];
   const role = deriveRoleFromGroups(groups);
   if (role === "visitor" && !groups.includes(VISITOR_GROUP)) {
-    console.warn(
-      `No recognized OIDC group for user ${email} (${sub}) — defaulting to visitor. Raw groups claim: ${
-        groups.length ? JSON.stringify(groups) : "<missing or empty>"
-      }`,
+    logger.warn(
+      { email, sub, groups },
+      "No recognized OIDC group for user — defaulting to visitor",
     );
   }
 
@@ -221,7 +221,10 @@ export function maybeBootstrapBricks(user: User): void {
       "INSERT INTO brick_state (color, holder_id, updated_at) VALUES (?, ?, ?)",
     ).run("red", user.id, Date.now());
     ensureGenesisRow("red", user.id);
-    console.log(`Bootstrapped red brick → ${user.displayName} (${user.sub})`);
+    logger.info(
+      { color: "red", holder: user.displayName, sub: user.sub },
+      "Bootstrapped red brick",
+    );
   }
 
   if (blueOwner && blueOwner === user.sub && !heldColors.has("blue")) {
@@ -229,7 +232,10 @@ export function maybeBootstrapBricks(user: User): void {
       "INSERT INTO brick_state (color, holder_id, updated_at) VALUES (?, ?, ?)",
     ).run("blue", user.id, Date.now());
     ensureGenesisRow("blue", user.id);
-    console.log(`Bootstrapped blue brick → ${user.displayName} (${user.sub})`);
+    logger.info(
+      { color: "blue", holder: user.displayName, sub: user.sub },
+      "Bootstrapped blue brick",
+    );
   }
 }
 
@@ -241,7 +247,7 @@ export function getSessionSecret(): string {
         "SESSION_SECRET environment variable is required in production. Generate with: openssl rand -hex 32",
       );
     }
-    console.warn("SESSION_SECRET not set — using random dev secret");
+    logger.warn("SESSION_SECRET not set — using random dev secret");
     return randomBytes(32).toString("hex");
   }
   return secret;
@@ -272,7 +278,7 @@ export function seedDevUsers(): void {
   for (const user of DEV_TEST_USERS) {
     upsertUser(user.sub, user.email, user.displayName, user.username, user.avatarUrl, user.role);
   }
-  console.log(`Seeded ${DEV_TEST_USERS.length} dev test users`);
+  logger.info(`Seeded ${DEV_TEST_USERS.length} dev test users`);
 }
 
 export function bootstrapDevBricks(): void {
@@ -298,7 +304,10 @@ export function bootstrapDevBricks(): void {
       "INSERT INTO brick_state (color, holder_id, updated_at) VALUES (?, ?, ?)",
     ).run(owner.color, user.id, Date.now());
     ensureGenesisRow(owner.color, user.id);
-    console.log(`Bootstrapped ${owner.color} brick → ${devUser.displayName}`);
+    logger.info(
+      { color: owner.color, holder: devUser.displayName },
+      "Bootstrapped dev brick",
+    );
   }
 }
 
