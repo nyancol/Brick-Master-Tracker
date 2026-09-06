@@ -29,8 +29,19 @@ services:
       # Distinguish this instance in the shared observability backend while
       # keeping service.name stable (OTEL_SERVICE_NAME stays brick-tracker).
       OTEL_RESOURCE_ATTRIBUTES: deployment.environment.name=preprod
+      # Environment identity for the UI badge (preprod shows «staging»).
+      APP_ENV: staging
     volumes: !override
       - brick-tracker-preprod-data:/app/data
+
+  # Same flagd sidecar as prod (inherited from compose.yaml), but watching
+  # THIS project's flag file so preprod flag values stay independent from
+  # production's. FLAGD_HOST=flagd from the base file still applies — the
+  # service name is unchanged, only the container name and mount differ.
+  flagd:
+    container_name: flagd-preprod
+    volumes: !override
+      - ./flags/flags.preprod.json:/etc/flagd/flags.json:ro
 
 volumes:
   brick-tracker-preprod-data:

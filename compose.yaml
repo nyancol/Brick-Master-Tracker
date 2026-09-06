@@ -20,13 +20,32 @@ services:
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-brick-tracker}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       SLOW_QUERY_THRESHOLD_MS: ${SLOW_QUERY_THRESHOLD_MS:-100}
+      # Feature flags: flagd sidecar on the shared `flags` network.
+      # The FlagdProvider reads FLAGD_HOST/FLAGD_PORT from the environment.
+      FLAGD_HOST: ${FLAGD_HOST:-flagd}
+      # Environment identity (drives the UI environment badge). Pinned here
+      # like DATA_PATH: a .env value must never make prod claim another env.
+      APP_ENV: production
     env_file:
       - .env
     networks:
       - caddy_public
       - telemetry
+      - flags
     volumes:
       - ./brick-tracker-data:/app/data
+    depends_on:
+      - flagd
+
+  flagd:
+    container_name: flagd
+    image: ghcr.io/open-feature/flagd:v0.16.2
+    command: start --uri file:/etc/flagd/flags.json
+    restart: unless-stopped
+    volumes:
+      - ./flags/flags.prod.json:/etc/flagd/flags.json:ro
+    networks:
+      - flags
 
 networks:
   caddy_public:
@@ -36,3 +55,5 @@ networks:
   telemetry:
     external: true
     name: "telemetry"
+  flags:
+    driver: bridge

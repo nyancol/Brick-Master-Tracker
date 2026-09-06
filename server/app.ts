@@ -10,6 +10,8 @@ import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
 import db from "./db.js";
 import logger from "./logger.js";
+import { initFlags, getAllFlagValues } from "./flags.js";
+import { getAppEnvironment } from "./env.js";
 import {
   initOidc,
   generateAuthUrl,
@@ -206,6 +208,8 @@ const app = express();
 
 await initOidc();
 
+initFlags();
+
 if (isDevLoginEnabled()) {
   seedDevUsers();
   bootstrapDevBricks();
@@ -331,6 +335,71 @@ function qs(param: unknown): string | undefined {
  */
 app.get("/healthz", (_req, res) => {
   res.json({ status: "ok" });
+});
+
+// GET /flags — feature flag values (public; no session required)
+/**
+ * @openapi
+ * /flags:
+ *   get:
+ *     tags: [Site]
+ *     summary: Feature flag values
+ *     operationId: getFlags
+ *     description: >
+ *       Returns the evaluated value of every known feature flag for this
+ *       environment. No authentication required. Values are re-evaluated per
+ *       request and follow the environment's flag definition file without a
+ *       restart. UI flag changes take effect on the client's next page load.
+ *     responses:
+ *       200:
+ *         description: Map of flag key to evaluated value
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties:
+ *                 oneOf:
+ *                   - type: boolean
+ *                   - type: string
+ *                   - type: number
+ */
+app.get("/flags", async (req, res) => {
+  try {
+    res.set("Cache-Control", "no-store");
+    res.json(await getAllFlagValues());
+  } catch (err) {
+    req.log.error({ err }, "GET /flags failed");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /environment — deployment environment identity (public; no session)
+/**
+ * @openapi
+ * /environment:
+ *   get:
+ *     tags: [Site]
+ *     summary: Deployment environment identity
+ *     operationId: getEnvironment
+ *     description: >
+ *       Returns which deployment environment the server is running in
+ *       (`APP_ENV`: dev, staging, or production; defaults to dev). No
+ *       authentication required. Drives the UI environment badge.
+ *     responses:
+ *       200:
+ *         description: Environment identity
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 environment:
+ *                   type: string
+ *                   enum: [dev, staging, production]
+ */
+app.get("/environment", (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.json({ environment: getAppEnvironment() });
 });
 
 // POST /api/visits — register a page visit (deduplicated per browser session)

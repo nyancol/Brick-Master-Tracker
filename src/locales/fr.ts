@@ -90,6 +90,10 @@ const fr = {
       past: "il y a {days} jours",
     },
   },
+  env: {
+    dev: "dev",
+    staging: "staging",
+  },
   footer: {
     counterLabel: "Tu es le visiteur numéro",
     webringTitle: "⚜ L'Anneau Web des Briques ⚜",

@@ -90,6 +90,10 @@ const en = {
       past: "{days} days past",
     },
   },
+  env: {
+    dev: "dev",
+    staging: "staging",
+  },
   footer: {
     counterLabel: "Thou art visitor number",
     webringTitle: "⚜ Ye Olde Brick Webring ⚜",

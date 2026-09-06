@@ -1,6 +1,6 @@
 {
   "name": "brick-master-tracker",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -12,6 +12,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@openfeature/flagd-provider": "^0.16.1",
+    "@openfeature/react-sdk": "^1.4.1",
+    "@openfeature/server-sdk": "^1.23.0",
+    "@openfeature/web-sdk": "^1.10.0",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/core": "^2.11.0",
     "@opentelemetry/exporter-metrics-otlp-http": "^0.222.0",

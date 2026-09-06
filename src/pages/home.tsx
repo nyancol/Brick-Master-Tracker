@@ -27,6 +27,7 @@ import WebringFooter from "@/components/kitsch/WebringFooter";
 import Badges88 from "@/components/kitsch/Badges88";
 import ConstructionBadge from "@/components/kitsch/ConstructionBadge";
 import { LanguageToggle } from "@/components/language-toggle";
+import EnvironmentBadge from "@/components/EnvironmentBadge";
 
 interface LedgerRow {
   userId: number;
@@ -104,9 +105,10 @@ function TenureLedger({
 interface Props {
   user: AuthUser;
   users: UserEntry[];
+  environment: string;
 }
 
-export default function Home({ user, users }: Props) {
+export default function Home({ user, users, environment }: Props) {
   const [, forceRender] = useState(0);
   const { toast } = useToast();
   const { play: playSfx } = useSfx();
@@ -461,6 +463,9 @@ export default function Home({ user, users }: Props) {
             </p>
             <div className="pt-3">
               <ConstructionBadge />
+            </div>
+            <div className="pt-2">
+              <EnvironmentBadge environment={environment} />
             </div>
           </div>
         </div>

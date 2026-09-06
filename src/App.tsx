@@ -6,7 +6,7 @@ import Login from "@/pages/login";
 import { Loader2 } from "lucide-react";
 import { t } from "@/hooks/use-translation";
 
-export default function App() {
+export default function App({ environment = "dev" }: { environment?: string }) {
   const { data, loading } = useCurrentUser();
 
   if (loading) {
@@ -28,7 +28,7 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <Home user={data.user} users={data.users} />
+      <Home user={data.user} users={data.users} environment={environment} />
       <Toaster />
     </ThemeProvider>
   );
