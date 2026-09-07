@@ -14,7 +14,6 @@ const distDir = path.resolve(__dirname, "..", "dist", "public");
 const server = express();
 server.use("/api", app);
 server.use(express.static(distDir));
-
 // SPA fallback — any non-API GET returns index.html
 server.use((req, res, next) => {
   if (req.path.startsWith("/api/") || req.path === "/api") return next();
@@ -31,6 +30,24 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-server.listen(port, () => {
+const httpServer = server.listen(port, () => {
   logger.info(`Brick Tracker listening on :${port}`);
 });
+
+// Graceful shutdown: stop accepting connections, flush telemetry, then exit.
+// The telemetry bootstrap chunk (dist/telemetry.mjs) exposes its shutdown via
+// a global handoff — a static import here would evaluate the SDK twice.
+for (const signal of ["SIGTERM", "SIGINT"] as const) {
+  process.once(signal, () => {
+    httpServer.close(() => {});
+    void (async () => {
+      try {
+        await globalThis.__brickTrackerShutdownTelemetry?.();
+      } catch (err) {
+        logger.error({ err }, "Telemetry shutdown failed");
+      } finally {
+        process.exit(0);
+      }
+    })();
+  });
+}

@@ -3,6 +3,7 @@ import session from "express-session";
 import multer from "multer";
 import { v4 as uuidv4 } from "uuid";
 import { mkdirSync, unlinkSync, existsSync } from "node:fs";
+import { performance } from "node:perf_hooks";
 import { join, resolve, extname } from "node:path";
 import { context, trace } from "@opentelemetry/api";
 import createSqliteStore from "better-sqlite3-session-store";
@@ -10,6 +11,7 @@ import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
 import db from "./db.js";
 import logger from "./logger.js";
+import { countLogin, countSeize, countTransfer, countVisit, recordHttpRequest } from "./metrics.js";
 import { initFlags, getAllFlagValues } from "./flags.js";
 import { getAppEnvironment } from "./env.js";
 import pkg from "../package.json";
@@ -257,6 +259,21 @@ app.use((req, _res, next) => {
   next();
 });
 
+// RED metrics: record duration + count after the response finishes, so the
+// real status code is captured. Route is templated (req.route.path) to keep
+// cardinality at route count; unmatched requests use "unknown".
+app.use((req, res, next) => {
+  const startedAt = performance.now();
+  res.on("finish", () => {
+    const route =
+      typeof req.route?.path === "string" && req.route.path
+        ? req.route.path
+        : "unknown";
+    recordHttpRequest(route, req.method, res.statusCode, (performance.now() - startedAt) / 1000);
+  });
+  next();
+});
+
 // Generate OpenAPI spec from JSDoc annotations
 const swaggerSpec = swaggerJsdoc({
   definition: {
@@ -452,6 +469,9 @@ app.post("/visits", (req, res) => {
         "INSERT INTO site_stats (key, value) VALUES ('visits', 1) ON CONFLICT(key) DO UPDATE SET value = value + 1",
       ).run();
       res.cookie("counted", "1", { httpOnly: true, sameSite: "lax" });
+      countVisit(true);
+    } else {
+      countVisit(false);
     }
 
     const row = db
@@ -577,13 +597,16 @@ app.get("/auth/callback", async (req, res) => {
     req.session.save((err) => {
       if (err) {
         req.log.error({ err }, "Session save failed");
+        countLogin("oidc", "error");
         res.status(500).json({ error: "Failed to create session" });
         return;
       }
+      countLogin("oidc", "success");
       res.redirect("/");
     });
   } catch (err) {
     req.log.error({ err }, "Auth callback failed");
+    countLogin("oidc", "error");
     res
       .status(401)
       .json({ error: err instanceof Error ? err.message : "Authentication failed" });
@@ -758,9 +781,11 @@ app.post("/auth/dev/login", (req, res) => {
   req.session.save((err) => {
     if (err) {
       req.log.error({ err }, "Dev login session save failed");
+      countLogin("dev", "error");
       res.status(500).json({ error: "Failed to create session" });
       return;
     }
+    countLogin("dev", "success");
     res.json(getAuthMe(user.id));
   });
 });
@@ -1131,11 +1156,14 @@ app.post("/bricks/:color/transfer", requireAuth, (req, res) => {
   const { to, description, imageIds } = req.body;
 
   if (!VALID_COLORS.has(color)) {
+    countTransfer("red", "error");
     res.status(400).json({ error: "Invalid brick color" });
     return;
   }
+  const brickColor = color as "red" | "blue";
 
   if (color === "blue") {
+    countTransfer("blue", "error");
     res
       .status(403)
       .json({ error: "The Shame cannot be given — it must be seized" });
@@ -1143,11 +1171,13 @@ app.post("/bricks/:color/transfer", requireAuth, (req, res) => {
   }
 
   if (typeof to !== "number" || !Number.isInteger(to)) {
+    countTransfer(brickColor, "error");
     res.status(400).json({ error: "Invalid recipient user ID" });
     return;
   }
 
   if (!description || typeof description !== "string" || !description.trim()) {
+    countTransfer(brickColor, "error");
     res.status(400).json({ error: "Description is required" });
     return;
   }
@@ -1160,6 +1190,7 @@ app.post("/bricks/:color/transfer", requireAuth, (req, res) => {
     .get(currentUserId) as { role: string } | undefined;
 
   if (!currentUser || currentUser.role !== "knight") {
+    countTransfer(brickColor, "error");
     res.status(403).json({ error: "Only knights can transfer this brick" });
     return;
   }
@@ -1246,13 +1277,16 @@ app.post("/bricks/:color/transfer", requireAuth, (req, res) => {
     })() as unknown as TxResult;
 
     if ("error" in result) {
+      countTransfer(brickColor, "error");
       res.status(result.status).json({ error: result.error });
       return;
     }
 
+    countTransfer(brickColor, "success");
     res.json(result.data);
   } catch (err) {
     req.log.error({ err }, "POST transfer failed");
+    countTransfer(brickColor, "error");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -1311,6 +1345,7 @@ app.post("/bricks/blue/seize", requireAuth, (req, res) => {
   const { description, imageIds } = req.body ?? {};
 
   if (!description || typeof description !== "string" || !description.trim()) {
+    countSeize("error");
     res.status(400).json({ error: "Description is required" });
     return;
   }
@@ -1323,6 +1358,7 @@ app.post("/bricks/blue/seize", requireAuth, (req, res) => {
     .get(currentUserId) as { role: string } | undefined;
 
   if (!currentUser || currentUser.role !== "knight") {
+    countSeize("error");
     res.status(403).json({ error: "Only knights can seize the Shame" });
     return;
   }
@@ -1398,13 +1434,16 @@ app.post("/bricks/blue/seize", requireAuth, (req, res) => {
     })() as unknown as TxResult;
 
     if ("error" in result) {
+      countSeize("error");
       res.status(result.status).json({ error: result.error });
       return;
     }
 
+    countSeize("success");
     res.json(result.data);
   } catch (err) {
     req.log.error({ err }, "POST seize failed");
+    countSeize("error");
     res.status(500).json({ error: "Internal server error" });
   }
 });

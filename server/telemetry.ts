@@ -20,14 +20,51 @@ import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { diag, DiagLogLevel, type DiagLogger } from "@opentelemetry/api";
 import { resourceFromAttributes } from "@opentelemetry/resources";
-import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import { setGlobalErrorHandler } from "@opentelemetry/core";
 import logger from "./logger.js";
+import { getAppEnvironment } from "./env.js";
+import pkg from "../package.json";
+
+// Spec-stable resource keys, kept as literals instead of the
+// @opentelemetry/semantic-conventions dependency: the separate "-stable"
+// package does not exist, and these strings are frozen by the spec.
+const ATTR_SERVICE_NAME = "service.name";
+const ATTR_SERVICE_VERSION = "service.version";
+const ATTR_DEPLOYMENT_ENVIRONMENT_NAME = "deployment.environment.name";
+
+const SHUTDOWN_TIMEOUT_MS = 5000;
+
+declare global {
+  // Handoff for server/index.ts, which cannot statically import this module:
+  // it is bundled into dist/telemetry.mjs while index.ts becomes
+  // dist/server.mjs, so a static import would evaluate the SDK bootstrap
+  // twice (duplicate spans, duplicate metric readers).
+  var __brickTrackerShutdownTelemetry: (() => Promise<void>) | undefined;
+}
 
 const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 
 export function isTelemetryEnabled(): boolean {
   return Boolean(otlpEndpoint) && process.env.OTEL_SDK_DISABLED !== "true";
+}
+
+let sdk: NodeSDK | undefined;
+
+// Explicit deployment.environment.name in OTEL_RESOURCE_ATTRIBUTES wins;
+// otherwise fall back to APP_ENV (via getAppEnvironment(), default "dev").
+// The SDK's default env detector still merges the full OTEL_RESOURCE_ATTRIBUTES,
+// so this only supplies the fallback — never overrides the operator.
+function deploymentEnvironment(): string {
+  const raw = process.env.OTEL_RESOURCE_ATTRIBUTES ?? "";
+  for (const pair of raw.split(",")) {
+    const eq = pair.indexOf("=");
+    if (eq === -1) continue;
+    if (pair.slice(0, eq).trim() === ATTR_DEPLOYMENT_ENVIRONMENT_NAME) {
+      const value = pair.slice(eq + 1).trim();
+      if (value) return value;
+    }
+  }
+  return getAppEnvironment();
 }
 
 function startTelemetry(): void {
@@ -49,9 +86,11 @@ function startTelemetry(): void {
 
   const resource = resourceFromAttributes({
     [ATTR_SERVICE_NAME]: process.env.OTEL_SERVICE_NAME || "brick-tracker",
+    [ATTR_SERVICE_VERSION]: pkg.version,
+    [ATTR_DEPLOYMENT_ENVIRONMENT_NAME]: deploymentEnvironment(),
   });
 
-  const sdk = new NodeSDK({
+  sdk = new NodeSDK({
     resource,
     traceExporter: new OTLPTraceExporter(),
     metricReader: new PeriodicExportingMetricReader({
@@ -65,3 +104,19 @@ function startTelemetry(): void {
 }
 
 startTelemetry();
+
+/**
+ * Flush and shut down the SDK (spans, metric batches). Bounded by
+ * SHUTDOWN_TIMEOUT_MS so a hung collector never stalls deploys; resolves
+ * immediately when telemetry is disabled.
+ */
+export async function shutdownTelemetry(): Promise<void> {
+  if (!sdk) return;
+  await Promise.race([
+    sdk.shutdown(),
+    new Promise((resolve) => setTimeout(resolve, SHUTDOWN_TIMEOUT_MS)),
+  ]);
+}
+
+// Handoff for the entry point (see global declaration above).
+globalThis.__brickTrackerShutdownTelemetry = shutdownTelemetry;

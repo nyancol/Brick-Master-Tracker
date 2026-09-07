@@ -63,3 +63,10 @@ The telemetry-related environment variables (`OTEL_EXPORTER_OTLP_ENDPOINT`, `OTE
 #### Scenario: A new deployment can enable telemetry from env alone
 - **WHEN** an operator copies `.env.example`, fills in the telemetry variables, and runs `docker compose up`
 - **THEN** the app exports telemetry to the standalone collector without any code changes
+
+### Requirement: Code-set resource fallback is documented
+`.env.example` SHALL document that `service.version` and the `deployment.environment.name` fallback (`OTEL_RESOURCE_ATTRIBUTES` override → `APP_ENV` → `dev`) are set in code, so operators know explicit `OTEL_RESOURCE_ATTRIBUTES` is only needed to override the default.
+
+#### Scenario: Operator reads telemetry docs
+- **WHEN** an operator reads the observability section of `.env.example`
+- **THEN** the fallback precedence for `deployment.environment.name` and the automatic `service.version` are described without requiring code reading
