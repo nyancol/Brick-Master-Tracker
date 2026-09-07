@@ -1,4 +1,37 @@
 import { useState, useEffect, useCallback } from "react";
+import type {
+  AuthMeResponse,
+  AuthUser,
+  BrickColor,
+  BrickState,
+  DevLoginInfo,
+  DevUserEntry,
+  StagingImage,
+  Transfer,
+  TransferComment,
+  TransferImage,
+  TransferResult,
+  TransferStory,
+  UserEntry,
+  UserRole,
+} from "../shared/types";
+
+export type {
+  AuthMeResponse,
+  AuthUser,
+  BrickColor,
+  BrickState,
+  DevLoginInfo,
+  DevUserEntry,
+  StagingImage,
+  Transfer,
+  TransferComment,
+  TransferImage,
+  TransferResult,
+  TransferStory,
+  UserEntry,
+  UserRole,
+};
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
@@ -7,98 +40,6 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
     throw new Error(`HTTP ${res.status}${text ? `: ${text}` : ""}`);
   }
   return res.json() as Promise<T>;
-}
-
-export type BrickColor = "red" | "blue";
-
-export type UserRole = "knight" | "visitor";
-
-export interface BrickState {
-  color: BrickColor;
-  holderId: number | null;
-  holderName: string;
-  holderAvatarUrl: string | null;
-  updatedAt: string;
-}
-
-export interface Transfer {
-  id: number;
-  color: BrickColor;
-  fromId: number | null;
-  fromName: string | null;
-  toId: number;
-  toName: string;
-  transferredById: number;
-  transferredByName: string;
-  transferredAt: string;
-}
-
-export interface TransferStory {
-  description: string | null;
-  editedBy: number | null;
-  editedByName: string | null;
-  editedAt: string | null;
-  images: TransferImage[];
-}
-
-export interface TransferImage {
-  id: number;
-  filename: string;
-  originalName: string;
-  mimeType: string;
-  uploadedAt: string;
-}
-
-export interface StagingImage {
-  id: number;
-  filename: string;
-  originalName: string;
-  mimeType: string;
-}
-
-export interface TransferComment {
-  id: number;
-  authorId: number;
-  authorName: string;
-  authorRole: UserRole;
-  body: string;
-  createdAt: string;
-  blottedAt: string | null;
-  huzzahCount: number;
-  huzzahedByMe: boolean;
-}
-
-export interface AuthUser {
-  id: number;
-  email: string;
-  displayName: string;
-  username: string;
-  avatarUrl: string | null;
-  role: UserRole;
-}
-
-export interface UserEntry {
-  id: number;
-  displayName: string;
-  username: string;
-  avatarUrl: string | null;
-  role: UserRole;
-}
-
-interface AuthMeResponse {
-  user: AuthUser;
-  users: UserEntry[];
-}
-
-export interface DevUserEntry {
-  username: string;
-  displayName: string;
-  role: UserRole;
-}
-
-export interface DevLoginInfo {
-  enabled: boolean;
-  users: DevUserEntry[];
 }
 
 interface DataState<T> {
@@ -162,15 +103,6 @@ export async function registerVisit(): Promise<number> {
     method: "POST",
   });
   return res.count;
-}
-
-export interface TransferResult {
-  transferId: number;
-  color: string;
-  holderId: number;
-  holderName: string;
-  holderAvatarUrl: string | null;
-  updatedAt: string;
 }
 
 export async function transferBrick(

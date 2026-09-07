@@ -1,5 +1,6 @@
 .opencode
 .env
+.env.preprod
 
 # dependencies
 node_modules

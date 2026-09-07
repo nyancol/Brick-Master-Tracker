@@ -1,4 +1,11 @@
-const fr = {
+import type en from "./en";
+
+/** Widens literal string types so `fr` must match `en`'s key structure exactly. */
+type Widen<T> = T extends string
+  ? string
+  : { [K in keyof T]: Widen<T[K]> };
+
+const fr: Widen<typeof en> = {
   title: "La Brique",
   subtitle: "Les briques légendaires de l'Honneur et de la Honte",
   honor: {
@@ -133,6 +140,6 @@ const fr = {
     title: "Halte ! Qui va là ?",
     description: "Nulle page n'existe en ces terres.",
   },
-} as const;
+};
 
 export default fr;

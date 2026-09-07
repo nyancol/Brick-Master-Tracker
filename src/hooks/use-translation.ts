@@ -5,6 +5,21 @@ import { resolveDefaultLanguage } from "../lib/language";
 const locales = { en, fr };
 type Lang = keyof typeof locales;
 
+/**
+ * Dot-path union of every leaf key in the `en` locale (e.g. "marginalia.age.now").
+ * Derived from the source of truth so a renamed/removed key fails typecheck here
+ * instead of silently rendering the raw key.
+ */
+type NestedKeys<T> = T extends string
+  ? never
+  : {
+      [K in keyof T & string]: T[K] extends string
+        ? K
+        : `${K}.${NestedKeys<T[K]>}`;
+    }[keyof T & string];
+
+export type TKey = NestedKeys<typeof en>;
+
 /** Gets a nested value from the locale object using dot notation. */
 function getNested(obj: Record<string, unknown>, path: string): string {
   const value = path.split(".").reduce<unknown>((acc, part) => {
@@ -22,9 +37,7 @@ function getLang(): Lang {
 
 let currentLang: Lang = getLang();
 
-export type TKey = keyof typeof en | "honor.name" | "honor.heldBy" | "honor.transferTo" | "honor.waitingForTransfer" | "shame.name" | "shame.cursedUpon" | "shame.offloadTo" | "shame.seize" | "shame.holderWaiting" | "shame.waitingForTransfer" | "chronicles.title" | "chronicles.empty" | "chronicles.chapter" | "chronicles.editedBy" | "chronicles.on" | "chronicles.yearGroup" | "modal.cancel" | "modal.confirm" | "modal.descriptionLabel" | "modal.descriptionRequired" | "modal.uploadPhoto" | "modal.uploading" | "edit.save" | "edit.edit" | "edit.deletePhoto" | "edit.confirmDeletePhoto" | "notFound.title" | "notFound.description" | "logout" | "transfer.onlyKnights" | "transfer.recipientNotKnight" | "transfer.shameCannotBeGiven" | "transfer.seizeOnlyAnotherKnight" | "transfer.seizeOnlyKnights" | "marginalia.header" | "marginalia.glossCount" | "marginalia.empty" | "marginalia.placeholder" | "marginalia.submit" | "marginalia.tooLong" | "marginalia.huzzah" | "marginalia.huzzahRebuke" | "marginalia.blot" | "marginalia.blotted" | "marginalia.confirmBlot" | "marginalia.chisel" | "marginalia.confirmChisel" | "marginalia.age.now" | "marginalia.age.today" | "marginalia.age.yestereve" | "marginalia.age.past" | "window.seizeTitle" | "window.seizeFrom";
-
-export function t(key: string): string {
+export function t(key: TKey): string {
   return getNested(locales[currentLang] as unknown as Record<string, unknown>, key);
 }
 

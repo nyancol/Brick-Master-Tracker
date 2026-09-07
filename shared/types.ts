@@ -1,5 +1,7 @@
 export type UserRole = "knight" | "visitor";
 
+export type BrickColor = "red" | "blue";
+
 export interface User {
   id: number;
   sub: string;
@@ -17,8 +19,8 @@ export interface SessionUser {
 }
 
 export interface BrickState {
-  color: "red" | "blue";
-  holderId: number;
+  color: BrickColor;
+  holderId: number | null;
   holderName: string;
   holderAvatarUrl: string | null;
   updatedAt: string;
@@ -26,7 +28,7 @@ export interface BrickState {
 
 export interface Transfer {
   id: number;
-  color: "red" | "blue";
+  color: BrickColor;
   fromId: number | null;
   fromName: string | null;
   toId: number;
@@ -41,6 +43,7 @@ export interface TransferStory {
   editedBy: number | null;
   editedByName: string | null;
   editedAt: string | null;
+  images: TransferImage[];
 }
 
 export interface TransferImage {
@@ -61,4 +64,53 @@ export interface TransferComment {
   blottedAt: string | null;
   huzzahCount: number;
   huzzahedByMe: boolean;
+}
+
+export interface StagingImage {
+  id: number;
+  filename: string;
+  originalName: string;
+  mimeType: string;
+}
+
+export interface AuthUser {
+  id: number;
+  email: string;
+  displayName: string;
+  username: string;
+  avatarUrl: string | null;
+  role: UserRole;
+}
+
+export interface UserEntry {
+  id: number;
+  displayName: string;
+  username: string;
+  avatarUrl: string | null;
+  role: UserRole;
+}
+
+export interface AuthMeResponse {
+  user: AuthUser;
+  users: UserEntry[];
+}
+
+export interface DevUserEntry {
+  username: string;
+  displayName: string;
+  role: UserRole;
+}
+
+export interface DevLoginInfo {
+  enabled: boolean;
+  users: DevUserEntry[];
+}
+
+export interface TransferResult {
+  transferId: number;
+  color: string;
+  holderId: number;
+  holderName: string;
+  holderAvatarUrl: string | null;
+  updatedAt: string;
 }

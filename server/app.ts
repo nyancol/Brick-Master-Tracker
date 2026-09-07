@@ -12,6 +12,7 @@ import db from "./db.js";
 import logger from "./logger.js";
 import { initFlags, getAllFlagValues } from "./flags.js";
 import { getAppEnvironment } from "./env.js";
+import pkg from "../package.json";
 import {
   initOidc,
   generateAuthUrl,
@@ -31,7 +32,9 @@ import {
 
 const SqliteStore = createSqliteStore(session);
 
-const uploadsDir = resolve(process.env.IMAGE_PATH ?? "/app/data/upload");
+const uploadsDir = resolve(
+  process.env.IMAGE_PATH ?? join(process.env.DATA_PATH ?? "/app/data", "uploads"),
+);
 mkdirSync(uploadsDir, { recursive: true });
 
 const VALID_MIME = new Set([
@@ -51,10 +54,9 @@ const MIME_TO_EXT: Record<string, string> = {
 const upload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, uploadsDir),
-    filename: (_req, _file, cb) => {
-      const uuid = uuidv4();
-      const ext = MIME_TO_EXT[_req.file?.mimetype ?? ""] ?? "";
-      cb(null, `${uuid}${ext}`);
+    filename: (_req, file, cb) => {
+      const ext = MIME_TO_EXT[file.mimetype] ?? "";
+      cb(null, `${uuidv4()}${ext}`);
     },
   }),
   limits: { fileSize: 50 * 1024 * 1024 },
@@ -206,6 +208,12 @@ const upload = multer({
 
 const app = express();
 
+// Behind Caddy (the documented deployment), the node process sees plain HTTP.
+// Trust the first proxy hop so req.secure reflects the client's X-Forwarded-Proto
+// — express-session refuses to set a Secure cookie on connections it perceives
+// as insecure, so without this the cookie would silently vanish for https users.
+app.set("trust proxy", 1);
+
 await initOidc();
 
 initFlags();
@@ -225,7 +233,7 @@ app.use(
     cookie: {
       httpOnly: true,
       sameSite: "lax",
-      secure: false,
+      secure: process.env.APP_URL?.startsWith("https") === true,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     },
   }),
@@ -255,7 +263,7 @@ const swaggerSpec = swaggerJsdoc({
     openapi: "3.0.3",
     info: {
       title: "Brick Master Tracker API",
-      version: "0.0.1",
+      version: pkg.version,
       description:
         "API for tracking transfers of the Brick of Honor (red) and Brick of Shame (blue) " +
         "between three friends. Each transfer includes a story and optional images.\n\n" +

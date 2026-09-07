@@ -109,7 +109,7 @@ function ChronicleEntry({
   const [story, setStory] = useState<TransferStory | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const isSender = transfer.fromId === currentUser.id;
+  const isActor = transfer.transferredById === currentUser.id;
 
   const handleToggle = useCallback(async () => {
     if (expanded) {
@@ -181,7 +181,7 @@ function ChronicleEntry({
                 <StoryDisplay
                   story={story}
                   transferId={transfer.id}
-                  isSender={isSender}
+                  isActor={isActor}
                   toast={toast}
                   onUpdate={(updated) => setStory((s) => s ? { ...s, ...updated } : s)}
                 />
@@ -193,7 +193,7 @@ function ChronicleEntry({
               <PhotoGallery
                 images={story.images}
                 transferId={transfer.id}
-                isSender={isSender}
+                isActor={isActor}
                 toast={toast}
                 onAddImage={(img) =>
                   setStory((s) =>
@@ -220,13 +220,13 @@ function ChronicleEntry({
 function StoryDisplay({
   story,
   transferId,
-  isSender,
+  isActor,
   toast,
   onUpdate,
 }: {
   story: TransferStory;
   transferId: number;
-  isSender: boolean;
+  isActor: boolean;
   toast: ReturnType<typeof useToast>["toast"];
   onUpdate: (updated: { description: string; editedBy: number; editedByName: string; editedAt: string }) => void;
 }) {
@@ -279,7 +279,7 @@ function StoryDisplay({
     <div className="space-y-2">
       <div className="flex items-start justify-between gap-2">
         <p className="dropcap font-serif italic text-sm leading-relaxed">{story.description}</p>
-        {isSender && (
+        {isActor && (
           <button
             onClick={() => setEditing(true)}
             className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
@@ -301,14 +301,14 @@ function StoryDisplay({
 function PhotoGallery({
   images,
   transferId,
-  isSender,
+  isActor,
   toast,
   onAddImage,
   onDeleteImage,
 }: {
   images: TransferImage[];
   transferId: number;
-  isSender: boolean;
+  isActor: boolean;
   toast: ReturnType<typeof useToast>["toast"];
   onAddImage: (img: TransferImage) => void;
   onDeleteImage: (id: number) => void;
@@ -377,7 +377,7 @@ function PhotoGallery({
                   className="w-full h-full object-cover"
                 />
               </a>
-              {isSender && (
+              {isActor && (
                 <button
                   className="absolute top-1 right-1 bg-black/60 rounded-sm p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                   onClick={() => handleDelete(img.id)}
@@ -389,7 +389,7 @@ function PhotoGallery({
           ))}
         </div>
       )}
-      {isSender && (
+      {isActor && (
         <>
           <input
             ref={fileInputRef}

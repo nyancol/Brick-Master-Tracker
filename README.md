@@ -19,7 +19,7 @@ flowchart TB
     end
 
     subgraph Server["Express Server (single process)"]
-        routes["/api/* routes (17 total)"]
+        api["/api/* handlers (see /api/api-docs)"]
         sqlite[("better-sqlite3 (WAL mode)")]
     end
 
@@ -70,20 +70,26 @@ flowchart LR
 ├── pnpm-workspace.yaml         # onlyBuiltDependencies (better-sqlite3, esbuild)
 ├── tsconfig.json               # Strict TS config
 ├── vite.config.ts              # Vite + React + Tailwind + API dev middleware
-├── build-server.mjs            # esbuild → dist/server.mjs (+ telemetry chunks)
+├── build-server.mjs            # esbuild → dist/logger.js, dist/telemetry.mjs, dist/server.mjs
 ├── index.html                  # HTML shell
 ├── .env.example                # PORT, DB_PATH, OIDC, telemetry vars
 ├── mise.toml                   # Dev tools + preprod tasks (preprod-up/down/logs)
 │
 ├── shared/
-│   └── constants.ts            # FRIENDS array — single source of truth
+│   ├── flags.ts                 # Feature flag registry (server + client)
+│   └── types.ts                 # API payload types — single source of truth
 │
 ├── server/
 │   ├── index.ts                # Production entry: Express + static + SPA fallback
-│   ├── telemetry.ts            # OpenTelemetry SDK bootstrap (OTLP-gated)
+│   ├── app.ts                  # Express app: handlers, validation, logging
+│   ├── auth.ts                 # OIDC flow, sessions, users, dev test login
+│   ├── db.ts                   # SQLite init, schema creation, migrations, seed
+│   ├── flags.ts                # OpenFeature/flagd bootstrap + evaluation
+│   ├── env.ts                  # APP_ENV environment identity
 │   ├── logger.ts               # pino structured logging (dev/prod/OTLP modes)
-│   ├── app.ts                  # Express app: routes, validation, logging
-│   └── db.ts                   # SQLite init, schema creation, idempotent seed
+│   ├── telemetry.ts            # OpenTelemetry SDK bootstrap (OTLP-gated)
+│   ├── express-request.d.ts    # Request.log typings (trace correlation)
+│   └── session.d.ts            # express-session SessionData augmentation
 │
 ├── public/
 │   ├── favicon.svg
@@ -221,6 +227,12 @@ pnpm build
 PORT=5000 pnpm start
 ```
 
+The server bundle is three esbuild chunks (`build-server.mjs`): `dist/logger.js`
+(the pino logger, shared so the process has exactly one instance),
+`dist/telemetry.mjs` (OpenTelemetry bootstrap, injected as a banner import so it
+evaluates before every other import and can patch `http`/Express), and
+`dist/server.mjs` (the application entry point).
+
 ### Testing with dev test users (no OIDC provider)
 
 During development you can sign in without the OIDC provider. When dev login is enabled (the default outside production), the login page shows a **"Dev test users"** picker with three seeded accounts — **Yann**, **Anselme**, and **Thomas** — in addition to the normal "Sign in" button.
@@ -270,6 +282,14 @@ The database is created automatically on first request. No migration or seed com
   ```bash
   DB_PATH=./data/brick.db pnpm dev
   ```
+
+Uploads live in a single canonical directory: `IMAGE_PATH` if set, otherwise `$DATA_PATH/uploads`. Deployments created before this convention stored files in `.../upload` (singular) — move them once after pulling this version:
+
+```bash
+# inside the container (works for any deployment; adjust the service name)
+docker compose exec brick-tracker sh -c 'mkdir -p /app/data/uploads && mv /app/data/upload/. /app/data/uploads/ && rmdir /app/data/upload'
+# or, for bind-mounted volumes, move the files on the host instead
+```
 
 ### Docker
 

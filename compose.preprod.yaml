@@ -20,6 +20,8 @@ services:
     container_name: brick-tracker-preprod
     ports: !override
       - "5173:5173"
+    env_file:
+      - .env.preprod
     environment:
       # Dev-mode port: preprod listens where dev does, prod keeps :5000.
       PORT: 5173

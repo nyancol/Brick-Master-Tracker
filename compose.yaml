@@ -9,7 +9,7 @@ services:
       - "5000:5000"
     environment:
       DB_PATH: /app/data/brick.db
-      IMAGE_PATH: /app/data/upload
+      IMAGE_PATH: /app/data/uploads
       # Pin inside the container: .env's DATA_PATH=./brick-tracker-data is a
       # host-dev value and would make db.ts mkdir a root-owned path (EACCES).
       DATA_PATH: /app/data
