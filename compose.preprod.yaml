@@ -33,6 +33,7 @@ services:
       OTEL_RESOURCE_ATTRIBUTES: deployment.environment.name=preprod
       # Environment identity for the UI badge (preprod shows «staging»).
       APP_ENV: staging
+      NODE_ENV: staging
     volumes: !override
       - brick-tracker-preprod-data:/app/data
 
