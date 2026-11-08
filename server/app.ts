@@ -2,9 +2,9 @@ import express from "express";
 import session from "express-session";
 import multer from "multer";
 import { v4 as uuidv4 } from "uuid";
-import { mkdirSync, unlinkSync, existsSync } from "node:fs";
+import { mkdirSync, unlinkSync, existsSync, readdirSync, renameSync, rmdirSync, statSync } from "node:fs";
 import { performance } from "node:perf_hooks";
-import { join, resolve, extname } from "node:path";
+import { join, resolve } from "node:path";
 import { context, trace } from "@opentelemetry/api";
 import createSqliteStore from "better-sqlite3-session-store";
 import swaggerJsdoc from "swagger-jsdoc";
@@ -38,6 +38,83 @@ const uploadsDir = resolve(
   process.env.IMAGE_PATH ?? join(process.env.DATA_PATH ?? "/app/data", "uploads"),
 );
 mkdirSync(uploadsDir, { recursive: true });
+
+// One-time migration for deployments that stored files in the legacy singular
+// `upload` directory (pre-canonical-convention): move files into the canonical
+// `uploads` directory at startup, so existing chronicle images keep serving.
+// Legacy locations checked: sibling of the canonical dir (`.../upload` when the
+// canonical dir is `.../uploads`), and `/app/data/upload` when IMAGE_PATH is
+// a custom override. DB filenames are unchanged — only files move.
+function migrateLegacyUploads(canonicalDir: string): void {
+  const candidates = new Set<string>();
+  if (canonicalDir.endsWith("uploads")) {
+    candidates.add(join(canonicalDir, "..", "upload"));
+  }
+  candidates.add("/app/data/upload");
+  for (const candidate of candidates) {
+    const legacyDir = resolve(candidate);
+    if (legacyDir === canonicalDir) continue;
+    let entries: string[];
+    try {
+      if (!existsSync(legacyDir) || !statSync(legacyDir).isDirectory()) continue;
+      entries = readdirSync(legacyDir);
+    } catch {
+      continue;
+    }
+    let moved = 0;
+    for (const entry of entries) {
+      const src = join(legacyDir, entry);
+      const dest = join(canonicalDir, entry);
+      try {
+        if (existsSync(dest)) continue;
+        renameSync(src, dest);
+        moved++;
+      } catch (err) {
+        logger.warn({ err, src, dest }, "Legacy upload migration: failed to move file");
+      }
+    }
+    try {
+      if (readdirSync(legacyDir).length === 0) rmdirSync(legacyDir);
+    } catch {
+      // leave non-empty legacy dir in place; files remain servable via fallback
+    }
+    if (moved > 0) logger.info(`Migrated ${moved} legacy upload(s) from ${legacyDir}`);
+  }
+}
+
+migrateLegacyUploads(uploadsDir);
+
+// Resolve the on-disk path for a stored filename. Prefers the canonical dir,
+// falling back to the legacy singular `upload` sibling so images keep serving
+// even when the startup migration could not move them (e.g. permissions).
+function resolveUploadPath(filename: string): string | null {
+  const canonical = join(uploadsDir, filename);
+  if (existsSync(canonical)) return canonical;
+  if (uploadsDir.endsWith("uploads")) {
+    const legacy = join(uploadsDir, "..", "upload", filename);
+    if (existsSync(legacy)) return legacy;
+  }
+  const appDataLegacy = join("/app/data/upload", filename);
+  if (appDataLegacy !== canonical && existsSync(appDataLegacy)) return appDataLegacy;
+  return null;
+}
+
+// Delete a stored file from wherever it lives (canonical dir or legacy dir),
+// so deletes work for images that predate the startup migration.
+function removeUploadFile(filename: string): void {
+  const candidates = new Set<string>([join(uploadsDir, filename)]);
+  if (uploadsDir.endsWith("uploads")) {
+    candidates.add(join(uploadsDir, "..", "upload", filename));
+  }
+  candidates.add(join("/app/data/upload", filename));
+  for (const filePath of candidates) {
+    try {
+      if (existsSync(filePath)) unlinkSync(filePath);
+    } catch (err) {
+      logger.warn({ err, filePath }, "Failed to delete upload file");
+    }
+  }
+}
 
 const VALID_MIME = new Set([
   "image/jpeg",
@@ -1584,10 +1661,7 @@ app.delete("/uploads/staging/:id", requireAuth, (req, res) => {
       return;
     }
 
-    const filePath = join(uploadsDir, img.filename);
-    if (existsSync(filePath)) {
-      unlinkSync(filePath);
-    }
+    removeUploadFile(img.filename);
     db.prepare("DELETE FROM transfer_images WHERE id = ?").run(imgId);
 
     res.json({ deleted: true });
@@ -1774,10 +1848,7 @@ app.delete("/transfers/:id/images/:imageId", requireAuth, (req, res) => {
       return;
     }
 
-    const filePath = join(uploadsDir, img.filename);
-    if (existsSync(filePath)) {
-      unlinkSync(filePath);
-    }
+    removeUploadFile(img.filename);
     db.prepare("DELETE FROM transfer_images WHERE id = ?").run(imgId);
 
     res.json({ deleted: true });
@@ -2270,8 +2341,8 @@ app.get("/uploads/:filename", requireAuth, (req, res) => {
       return;
     }
 
-    const filePath = join(uploadsDir, img.filename);
-    if (!existsSync(filePath)) {
+    const filePath = resolveUploadPath(img.filename);
+    if (!filePath) {
       res.status(404).json({ error: "Image file not found" });
       return;
     }

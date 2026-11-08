@@ -64,7 +64,7 @@ The system SHALL allow images to be uploaded before a transfer exists, in a stag
 
 ### Requirement: File storage
 
-The system SHALL store uploaded images on the local filesystem in a single canonical uploads directory, resolved as `IMAGE_PATH` when set, otherwise `$DATA_PATH/uploads`. The stored filename SHALL be a UUID with the extension derived from the file's MIME type. Files stored by earlier versions without an extension SHALL remain servable.
+The system SHALL store uploaded images on the local filesystem in a single canonical uploads directory, resolved as `IMAGE_PATH` when set, otherwise `$DATA_PATH/uploads`. The stored filename SHALL be a UUID with the extension derived from the file's MIME type. Files stored by earlier versions without an extension SHALL remain servable. At startup the system SHALL move files left in the legacy singular `upload` directory into the canonical directory; when the move is not possible, serving and deletion SHALL fall back to the legacy location.
 
 #### Scenario: File stored with UUID name
 - **WHEN** an image is uploaded successfully

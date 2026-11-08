@@ -283,7 +283,7 @@ The database is created automatically on first request. No migration or seed com
   DB_PATH=./data/brick.db pnpm dev
   ```
 
-Uploads live in a single canonical directory: `IMAGE_PATH` if set, otherwise `$DATA_PATH/uploads`. Deployments created before this convention stored files in `.../upload` (singular) — move them once after pulling this version:
+Uploads live in a single canonical directory: `IMAGE_PATH` if set, otherwise `$DATA_PATH/uploads`. Deployments created before this convention stored files in `.../upload` (singular) — the server moves them into the canonical directory automatically at startup (and serves from the legacy location as a fallback when the move isn't possible). No manual step needed, but if you prefer to move them yourself:
 
 ```bash
 # inside the container (works for any deployment; adjust the service name)
