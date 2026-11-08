@@ -15,9 +15,11 @@ All animated GIFs sourced from [GifCities](https://gifcities.org) (Internet Arch
 | `swords.gif` | Crossed swords | https://web.archive.org/web/20091021221831/http://geocities.com/knightsofladyinamorata/knightsnews.html |
 | `lute-player.gif` | Medieval lute player | https://web.archive.org/web/20091022224547/http://geocities.com/Athens/Sparta/1512/music.html |
 | `harp.gif` | Golden harp | https://web.archive.org/web/20091027130114/http://geocities.com/bogueyman12/graphics/harp.gif |
+| `horn-herald.gif` | Herald blowing a long horn (2-frame toot) | https://web.archive.org/web/20070630071741/http://share.geocities.com/Area51/Cavern/5694/heraldri.gif |
 
 Generated locally (not hunted):
 
+- `horn-herald-static.png` — first frame of `horn-herald.gif`, extracted for the `prefers-reduced-motion` fallback (animated GIFs cannot be paused by CSS)
 - `stone-tile.jpg` — castle stone wall background tile, drawn procedurally and JPEG-crushed at quality 15 (era-fidelity compression artifacts, by design)
 - `dungeon-tile.png` — starfield background tile for Dungeon (dark) mode, drawn procedurally
 

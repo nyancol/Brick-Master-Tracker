@@ -175,10 +175,21 @@ The application SHALL include classic 1998 page furniture: a scrolling "Hear Ye!
 - **WHEN** at least one transfer exists
 - **THEN** the marquee SHALL display the latest transfer as a herald announcement (e.g. "Hear Ye! The Brick of Honor hath passed unto Sir Yann!")
 - **AND** the announcement SHALL scroll continuously unless `prefers-reduced-motion` is set
+- **AND** the scrolling announcement SHALL be flanked by a mirrored pair of horn-herald period GIFs (left and right, facing inward) at native pixel dimensions, rendered outside the scrolling text element
 
 #### Scenario: Marquee empty state
 - **WHEN** no transfers exist
 - **THEN** the marquee SHALL display a static herald call
+- **AND** the horn-herald pair SHALL still flank the bar
+
+#### Scenario: Marquee reduced motion
+- **WHEN** the user has `prefers-reduced-motion` enabled
+- **THEN** the marquee text SHALL render as static (non-scrolling) text
+- **AND** the horn-herald GIFs SHALL render as a static first-frame image instead of the animated GIF
+
+#### Scenario: Marquee horns are decorative
+- **WHEN** the marquee is rendered with horn-herald GIFs
+- **THEN** the horn images SHALL be hidden from assistive technology (`aria-hidden`, empty alt) so the marquee's announcement text remains the single accessible name
 
 #### Scenario: Visitor counter display
 - **WHEN** any page footer is rendered
@@ -245,6 +256,10 @@ The application SHALL use authentic period animated GIFs downloaded locally into
 #### Scenario: Construction knight
 - **WHEN** the construction badge is rendered
 - **THEN** a knight/mason period GIF SHALL be displayed
+
+#### Scenario: Herald horns flanking the marquee
+- **WHEN** the "Hear Ye!" herald marquee is rendered
+- **THEN** a horn-herald period GIF (herald blowing a horn, or fallback trumpet/herald figure) SHALL flank the announcement on both sides as a mirrored pair at native pixel dimensions
 
 #### Scenario: Local assets and attribution
 - **WHEN** GIFs are used anywhere in the app

@@ -310,6 +310,23 @@ a.bevel:active {
   }
 }
 
+/* ---- Herald horns flanking the marquee ---- */
+.marquee-horn {
+  height: 1.75rem;
+  width: auto;
+}
+.marquee-horn--static {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee-horn--animated {
+    display: none;
+  }
+  .marquee-horn--static {
+    display: inline;
+  }
+}
+
 /* ---- Illuminated drop cap ---- */
 .dropcap::first-letter {
   font-family: 'UnifrakturMaguntia', 'Times New Roman', serif;
